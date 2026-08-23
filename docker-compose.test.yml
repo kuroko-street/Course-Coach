@@ -1,0 +1,31 @@
+services:
+  test_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: coursecoach
+      POSTGRES_PASSWORD: coursecoach_pass
+      POSTGRES_DB: coursecoach_test
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coursecoach -d coursecoach_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  tests:
+    build:
+      context: ./backend
+    command: ["sh", "-c", "pip install --no-cache-dir -r requirements-dev.txt && pytest -q"]
+    environment:
+      DB_HOST: test_db
+      DB_PORT: 5432
+      DB_NAME: coursecoach_test
+      DB_USER: coursecoach
+      DB_PASSWORD: coursecoach_pass
+      UPLOADS_DIR: /tmp/coursecoach-test-uploads
+    depends_on:
+      test_db:
+        condition: service_healthy

@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:16
+    container_name: coursecoach_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: coursecoach
+      POSTGRES_PASSWORD: coursecoach_pass
+      POSTGRES_DB: coursecoach
+    # Expose PostgreSQL only on this machine so local tools such as DBeaver
+    # can connect without making the database public on the network.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coursecoach -d coursecoach"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build: ./backend
+    container_name: coursecoach_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: coursecoach
+      DB_USER: coursecoach
+      DB_PASSWORD: coursecoach_pass
+    ports:
+      # Same reasoning as db: the browser never talks to the backend
+      # directly, only the frontend's Vite proxy does (over the internal
+      # Docker network). Kept on localhost for your own debugging/curl.
+      - "127.0.0.1:5000:5000"
+    volumes:
+      # Review attachments (FR-9/FR-10) persisted outside the container.
+      - uploads_data:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    image: postgres:16
+    container_name: coursecoach_migrate
+    restart: "no"
+    environment:
+      PGPASSWORD: coursecoach_pass
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command:
+      - sh
+      - -c
+      - psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f /migrations/002_upgrade_sprint2.sql
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: coursecoach_frontend
+    restart: unless-stopped
+    ports:
+      # Host port 80 so the demo URL is just http://<server-ip> — no port
+      # number to relay to your professor/team. Change back to "3000:3000"
+      # for local development.
+      - "80:3000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  uploads_data:

@@ -1,0 +1,904 @@
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Thai",
+    sans-serif;
+  color: #1a1a1a;
+  background: #f4f5f7;
+
+  --brand: #3949ab;
+  --brand-soft: #eef2ff;
+  --border: #e3e5e8;
+  --muted: #777;
+  --danger: #b71c1c;
+  --success: #1b5e20;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px 72px;
+}
+
+h1 {
+  margin-bottom: 4px;
+  font-size: 26px;
+}
+
+h2 {
+  font-size: 19px;
+  margin-bottom: 10px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.muted.small {
+  font-size: 13px;
+  margin-top: -4px;
+}
+
+.warn {
+  color: #b26a00;
+}
+
+section {
+  margin-top: 28px;
+}
+
+/* ---- Nav bar ---- */
+.navbar {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.navbar-inner {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-link {
+  color: #444;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.nav-link:hover {
+  background: #f2f3f5;
+}
+
+.nav-link.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.nav-user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-username {
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.nav-username:hover {
+  text-decoration: underline;
+}
+
+.role-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.role-student {
+  background: #e3f2fd;
+  color: #0d47a1;
+}
+
+.role-admin {
+  background: #fff3e0;
+  color: #b26a00;
+}
+
+/* ---- Buttons ---- */
+button,
+.btn {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+button:disabled,
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #444;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.btn-ghost:hover {
+  background: #f2f3f5;
+}
+
+.btn-danger-outline {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid #f0c4c4;
+  padding: 5px 10px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  background: #fdecea;
+}
+
+.btn-keep {
+  background: #2e7d32;
+}
+
+.btn-delete {
+  background: #c62828;
+}
+
+/* ---- Login / user picker ---- */
+.user-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.user-card {
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  font-weight: 400;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.user-card:hover:not(:disabled) {
+  border-color: var(--brand);
+  transform: translateY(-2px);
+}
+
+.user-card-current {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(57, 73, 171, 0.12);
+}
+
+.user-card strong {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 16px;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+/* ---- Generic "no photo" avatar placeholder (Avatar.jsx) ---- */
+.avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #dcdee3;
+  color: #8b8f98;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.user-card-cta {
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+/* ---- Catalog filters ---- */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0 20px;
+  flex-wrap: wrap;
+}
+
+.search-bar {
+  flex: 1 1 260px;
+  padding: 11px 14px;
+  border: 1px solid #ccced2;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.department-select {
+  flex: 0 1 200px;
+  padding: 11px 12px;
+  border: 1px solid #ccced2;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.search-bar:focus,
+.department-select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(57, 73, 171, 0.12);
+}
+
+/* ---- Course catalog grid ---- */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.course-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.course-card:hover {
+  border-color: var(--brand);
+  transform: translateY(-2px);
+}
+
+.course-card strong {
+  display: block;
+  margin-top: 8px;
+}
+
+.course-rating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ---- Cards ---- */
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.card .meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* ---- Course detail ---- */
+.back-link {
+  display: inline-block;
+  color: var(--brand);
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.course-title {
+  margin-top: 10px;
+}
+
+.offering-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.offering-card {
+  margin-bottom: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.review-content {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.report-count {
+  color: #b26a00;
+}
+
+/* ---- Forms ---- */
+form.card {
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #ccced2;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.row-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---- Admin queue ---- */
+.admin-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-course {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-course:hover {
+  text-decoration: underline;
+}
+
+.report-badge {
+  background: #fdecea;
+  color: var(--danger);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-quote {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid #f0c4c4;
+  background: #fafafa;
+  border-radius: 0 6px 6px 0;
+  white-space: pre-wrap;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.empty-state p {
+  margin: 6px 0 0;
+}
+
+/* ---- Alerts ---- */
+.alert {
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.alert-error {
+  background: #fdecea;
+  color: var(--danger);
+  border: 1px solid #f5c6cb;
+}
+
+.alert-success {
+  background: #e8f5e9;
+  color: var(--success);
+  border: 1px solid #c3e6cb;
+}
+
+/* ---- Tags ---- */
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tag-chip {
+  display: inline-block;
+  background: #f2f3f5;
+  color: #444;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+a.tag-chip:hover,
+.tag-chip-button:hover {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.tag-chip-active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.tag-chip-static {
+  cursor: default;
+}
+
+.tag-chips-filter {
+  margin: -6px 0 20px;
+}
+
+/* ---- Course/instructor detail ---- */
+.detail-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-grid strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.detail-grid p {
+  margin: 0;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.instructor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.instructor-card p {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+
+.meta-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ---- Star ratings ---- */
+.star-display {
+  color: #f5a623;
+  letter-spacing: 1px;
+  font-size: 15px;
+}
+
+.star-input {
+  margin-bottom: 4px;
+}
+
+.star-row {
+  display: flex;
+  gap: 2px;
+}
+
+.star-btn {
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 22px;
+  line-height: 1;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.star-btn.star-filled {
+  color: #f5a623;
+}
+
+.rating-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.rating-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 4px 16px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.rating-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rating-label {
+  color: var(--muted);
+}
+
+/* ---- Review card interactions ---- */
+.review-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-like {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid #f0c4c4;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.btn-like:hover:not(:disabled) {
+  background: #fdecea;
+}
+
+.btn-like-active {
+  background: #fdecea;
+}
+
+.reviewer-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+.reviewer-link:hover {
+  text-decoration: underline;
+}
+
+.reviewer-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.small-inline {
+  font-size: 12px;
+}
+
+.edit-title {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* ---- File attachments ---- */
+.review-files {
+  margin-top: 12px;
+}
+
+.file-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.file-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.file-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- Comments ---- */
+.comment-thread {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+
+.comment-row {
+  font-size: 13px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.comment-author {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comment-author:hover {
+  text-decoration: underline;
+}
+
+.comment-content {
+  color: #333;
+}
+
+.comment-form {
+  display: flex;
+  gap: 8px;
+}
+
+.comment-form input {
+  flex: 1;
+}
+
+/* ---- Dashboard ranking ---- */
+.ranking-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ranking-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.ranking-card:hover {
+  border-color: var(--brand);
+  transform: translateY(-2px);
+}
+
+.ranking-rank {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--brand);
+  min-width: 36px;
+}
+
+.ranking-body {
+  flex: 1;
+}
+
+.ranking-stats {
+  display: flex;
+  gap: 18px;
+}
+
+.ranking-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 14px;
+}
+
+/* ---- Profile page ---- */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-stats {
+  display: flex;
+  gap: 28px;
+}
+
+.profile-review-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.profile-review-link:hover {
+  border-color: var(--brand);
+}
+
+/* ---- "วิชาที่มีสิทธิ์รีวิว" eligibility list ---- */
+.enrollment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.enrollment-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.enrollment-card:hover {
+  border-color: var(--brand);
+}
+
+.enrollment-card strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.enrollment-status {
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.enrollment-reviewed {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.enrollment-pending {
+  background: #e8f5e9;
+  color: var(--success);
+}
+
+@media (max-width: 560px) {
+  .row,
+  .row-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .ranking-card {
+    flex-wrap: wrap;
+  }
+
+  .ranking-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
