@@ -197,7 +197,61 @@ button:disabled,
   background: #c62828;
 }
 
-/* ---- Login / user picker ---- */
+/* ---- Google Workspace login ---- */
+.login-page {
+  min-height: calc(100vh - 150px);
+  display: grid;
+  place-items: center;
+  padding: 32px 0;
+}
+
+.google-login-card {
+  width: min(100%, 460px);
+  padding: 36px;
+  text-align: center;
+}
+
+.google-login-card h1 {
+  margin-bottom: 8px;
+}
+
+.login-mark {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.login-domain {
+  display: inline-block;
+  margin: 14px 0 22px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.google-button-slot {
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 8px;
+}
+
+.login-privacy {
+  margin: 22px auto 0;
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+/* ---- Legacy mock user cards (development only) ---- */
 .user-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

@@ -10,6 +10,11 @@ Microservices scaffold running on Docker Compose:
 
 ## Run
 
+Copy `.env.example` to `.env`, create a Google OAuth 2.0 Web client, and set
+`GOOGLE_CLIENT_ID`. For local use, add `http://localhost` to the client's
+authorised JavaScript origins. Keep `SESSION_SECRET` private and replace the
+example value before deployment.
+
 ```bash
 docker compose up --build
 ```
@@ -30,9 +35,11 @@ persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
 
 ## Demo walkthrough (End-to-End)
 
-1. **`/login`** — pick a character. Each pick POSTs to
-   `/api/auth/login-mock` and writes a `LOGIN` row into `audit_logs`.
-   Sign in as `somchai_s` (STUDENT).
+1. **`/login`** — sign in with a Google Workspace account managed by
+   `kmitl.ac.th`. The backend verifies Google's signed ID token and hosted
+   domain, links or creates the local user, writes a `LOGIN` audit event, and
+   starts an HttpOnly cookie session. The application never receives the
+   university password.
 2. **`/` Course Catalog** — search by code, name, **or tag** (e.g. try
    `เขียนโปรแกรม`) or instructor name using PostgreSQL full-text search, and
    filter by department. Course cards show their instructors and tags;
@@ -70,8 +77,9 @@ persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
    enrolled in and whether you've reviewed it yet — this is exactly the set
    of courses the write-review form on `/course/:id` will let you submit
    for.
-6. **`/admin` Admin Queue** — switch to `admin_wichai` (ADMIN) via the
-   navbar. The hidden review is waiting in the moderation queue.
+6. **`/admin` Admin Queue** — an existing administrator must grant the local
+   `ADMIN` role to the appropriate verified KMITL user in the database. The
+   hidden review is then available in the moderation queue.
    **✓ Keep** restores it (`status = ACTIVE`, `report_count = 0`) while
    preserving the `review_reports` history; **🗑 Delete** soft-deletes it
    (`status = DELETED`).
@@ -81,7 +89,7 @@ rejected with `403` by the API. Editing/deleting someone else's review, or
 uploading a file to someone else's review, is likewise blocked in the UI
 *and* rejected with `403` by the API.
 
-## Mock users
+## Seed users
 
 | id | username       | role    |
 |----|----------------|---------|
@@ -102,9 +110,10 @@ uploading a file to someone else's review, is likewise blocked in the UI
 - **ENUM over VARCHAR:** fixed-value columns (`users.role`,
   `reviews.status`, `audit_logs.action`) use PostgreSQL `ENUM` types
   (see `db/init.sql`).
-- **Server-side authorisation:** the frontend sends the current user in the
-  `X-User-Id` header; admin endpoints re-resolve that user and check the
-  role in the database. Review edit/delete and file upload re-check that
+- **Server-side authentication and authorisation:** Google Workspace proves
+  identity, while a signed HttpOnly cookie carries the application session.
+  The backend re-resolves that user and checks the role in the database.
+  Review edit/delete and file upload re-check that
   the caller is the review's own author. Hiding a button is never the only
   protection.
 - **Soft delete:** reviews are never physically removed — author or admin
@@ -127,8 +136,10 @@ uploading a file to someone else's review, is likewise blocked in the UI
 | Method | Path                                  | Auth        | Description                                          |
 |--------|---------------------------------------|-------------|--------------------------------------------------------|
 | GET    | `/health`                             | —           | Service + DB status                                    |
-| GET    | `/api/users`                          | —           | Mock characters for the login screen                   |
-| POST   | `/api/auth/login-mock`                | —           | Switch session user; logs `LOGIN`                       |
+| GET    | `/api/auth/config`                    | —           | Public Google login configuration                       |
+| POST   | `/api/auth/google`                    | —           | Verify Google ID token and create an HttpOnly session   |
+| GET    | `/api/auth/me`                        | login       | Return the session's current user                       |
+| POST   | `/api/auth/logout`                    | login       | Clear the current session                               |
 | GET    | `/api/departments`                    | —           | Distinct department list (powers the filter)            |
 | GET    | `/api/tags`                           | —           | Full tag list (tag filter row / autocomplete)           |
 | GET    | `/api/courses?search=&department=`    | —           | Full-text course search (code, name, department, tag, or instructor) |
@@ -154,25 +165,25 @@ uploading a file to someone else's review, is likewise blocked in the UI
 | POST   | `/api/admin/reviews/{id}/action`      | ADMIN       | `{"action": "KEEP" \| "DELETE"}`                          |
 | GET    | `/api/audit-logs?limit=`              | ADMIN       | Recent audit trail                                        |
 
-¹ `GET /api/courses/{id}/reviews` accepts an *optional* `X-User-Id` header
-to personalise `liked_by_me` on each review; it works fine without one.
+¹ `GET /api/courses/{id}/reviews` uses the optional session cookie to
+personalise `liked_by_me`; it works without a signed-in user.
 
-² "enrolled" means the `X-User-Id` header's user has a matching row in
+² "enrolled" means the signed-in user has a matching row in
 `enrollments` for that exact (course, academic_year, semester, section) —
 `403` otherwise, checked server-side regardless of what the client sends.
 
-"login"-gated endpoints just require *any* known user via `X-User-Id`
-(`401` if missing/unknown). "own review"-gated endpoints additionally
-check that the header's user is the review's `reviewer_id` (`403`
+"login"-gated endpoints require a valid session (`401` if missing or
+invalid). "own review"-gated endpoints additionally check that the session
+user is the review's `reviewer_id` (`403`
 otherwise). "self-only" endpoints require the header's user to BE the
 `{id}` in the path (`403` for anyone else — this is enrollment history,
-not public data). Admin endpoints require an `X-User-Id` naming an
-`ADMIN` (`401` if missing/unknown, `403` if the user is a student).
+not public data). Admin endpoints require the session user to have the local
+`ADMIN` role (`401` if unauthenticated, `403` if the user is a student).
 
 ### Example POST bodies
 
 ```json
-// POST /api/reviews (the author comes from X-User-Id, never from this body)
+// POST /api/reviews (the author comes from the session, never from this body)
 {
   "course_id": 1,
   "content": "Really solid intro course.",

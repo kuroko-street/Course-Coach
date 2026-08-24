@@ -31,6 +31,12 @@ services:
       DB_NAME: coursecoach
       DB_USER: coursecoach
       DB_PASSWORD: coursecoach_pass
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_ALLOWED_DOMAIN: kmitl.ac.th
+      SESSION_SECRET: ${SESSION_SECRET:-coursecoach-local-dev-change-me}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+      ALLOW_MOCK_AUTH: ${ALLOW_MOCK_AUTH:-false}
     ports:
       # Same reasoning as db: the browser never talks to the backend
       # directly, only the frontend's Vite proxy does (over the internal
@@ -54,7 +60,7 @@ services:
     command:
       - sh
       - -c
-      - psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f /migrations/002_upgrade_sprint2.sql
+      - for migration in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f "$$migration" || exit 1; done
     depends_on:
       db:
         condition: service_healthy

@@ -1,37 +1,19 @@
 /**
  * Thin fetch wrapper around the backend API.
  *
- * Every request carries the currently selected mock user in the X-User-Id
- * header. The backend uses that header as its "session" and re-checks the
- * user's role server-side, so hiding a button in the UI is never the only
- * thing standing between a student and an admin endpoint.
+ * Authentication is carried by an HttpOnly session cookie. The browser sends
+ * it automatically and JavaScript never needs to read the credential.
  */
 
-const STORAGE_KEY = "coursecoach.user";
-
-export function loadStoredUser() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function storeUser(user) {
-  if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-  else localStorage.removeItem(STORAGE_KEY);
-}
-
 /** Perform an API call and unwrap FastAPI's error shape into an Error. */
-export async function api(path, { method = "GET", body, userId } = {}) {
+export async function api(path, { method = "GET", body } = {}) {
   const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (userId != null) headers["X-User-Id"] = String(userId);
 
   const res = await fetch(`/api${path}`, {
     method,
     headers,
+    credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
@@ -58,9 +40,8 @@ export async function api(path, { method = "GET", body, userId } = {}) {
  * file body must NOT be JSON.stringify'd, and the browser needs to set its
  * own multipart boundary in Content-Type (so we must not set that header).
  */
-export async function apiUpload(path, { file, userId } = {}) {
+export async function apiUpload(path, { file } = {}) {
   const headers = {};
-  if (userId != null) headers["X-User-Id"] = String(userId);
 
   const formData = new FormData();
   formData.append("file", file);
@@ -68,6 +49,7 @@ export async function apiUpload(path, { file, userId } = {}) {
   const res = await fetch(`/api${path}`, {
     method: "POST",
     headers,
+    credentials: "include",
     body: formData,
   });
 

@@ -25,6 +25,7 @@ CREATE TABLE users (
     user_id            SERIAL PRIMARY KEY,
     username           VARCHAR(100) NOT NULL UNIQUE,
     email              VARCHAR(255) NOT NULL UNIQUE,
+    google_sub         VARCHAR(255) NULL UNIQUE,
     role               user_role    NOT NULL DEFAULT 'STUDENT',
     avatar_url         VARCHAR(500) NULL,
     is_report_blocked  BOOLEAN      NOT NULL DEFAULT FALSE,

@@ -25,6 +25,56 @@ class UserRepository:
             )
             return cur.fetchone()
 
+    def find_or_create_google_user(self, conn, google_sub, email, display_name, avatar_url):
+        """Link a verified Google identity without changing an existing role."""
+        fields = """user_id, username, email, role, avatar_url,
+                    is_report_blocked, blocked_until"""
+        with dict_cursor(conn) as cur:
+            cur.execute(f"SELECT {fields} FROM users WHERE google_sub = %s;", (google_sub,))
+            user = cur.fetchone()
+            if user is not None:
+                cur.execute(
+                    f"""
+                    UPDATE users SET email = %s, avatar_url = COALESCE(%s, avatar_url)
+                    WHERE user_id = %s RETURNING {fields};
+                    """,
+                    (email, avatar_url, user["user_id"]),
+                )
+                return cur.fetchone()
+
+            cur.execute("SELECT user_id FROM users WHERE LOWER(email) = LOWER(%s);", (email,))
+            existing = cur.fetchone()
+            if existing is not None:
+                cur.execute(
+                    f"""
+                    UPDATE users SET google_sub = %s, avatar_url = COALESCE(%s, avatar_url)
+                    WHERE user_id = %s RETURNING {fields};
+                    """,
+                    (google_sub, avatar_url, existing["user_id"]),
+                )
+                return cur.fetchone()
+
+            base_username = (display_name or email.split("@", 1)[0]).strip()[:90]
+            if not base_username:
+                base_username = "kmitl-user"
+            username = base_username
+            suffix = 1
+            while True:
+                cur.execute("SELECT 1 FROM users WHERE username = %s;", (username,))
+                if cur.fetchone() is None:
+                    break
+                suffix += 1
+                username = f"{base_username[:85]}-{suffix}"
+
+            cur.execute(
+                f"""
+                INSERT INTO users (username, email, role, avatar_url, google_sub)
+                VALUES (%s, %s, 'STUDENT', %s, %s) RETURNING {fields};
+                """,
+                (username, email, avatar_url, google_sub),
+            )
+            return cur.fetchone()
+
     def get_profile(self, conn, user_id):
         with dict_cursor(conn) as cur:
             cur.execute(
