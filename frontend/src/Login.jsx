@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
+import Avatar from "./Avatar.jsx";
 
 const GOOGLE_SCRIPT_ID = "google-identity-services";
 
@@ -26,13 +27,15 @@ function loadGoogleIdentityScript() {
 }
 
 export default function Login() {
-  const { user, login, authReady } = useAuth();
+  const { user, login, loginMock, authReady } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const buttonRef = useRef(null);
   const [config, setConfig] = useState(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [mockUsers, setMockUsers] = useState([]);
+  const [mockPendingId, setMockPendingId] = useState(null);
 
   const handleCredential = useCallback(
     async ({ credential }) => {
@@ -55,9 +58,31 @@ export default function Login() {
 
   useEffect(() => {
     api("/auth/config")
-      .then(setConfig)
+      .then(async (nextConfig) => {
+        setConfig(nextConfig);
+        if (nextConfig.mock_login_enabled) {
+          const data = await api("/users");
+          setMockUsers(data.users);
+        }
+      })
       .catch((err) => setError(err.message));
   }, []);
+
+  async function handleMockLogin(candidate) {
+    setError("");
+    setMockPendingId(candidate.user_id);
+    try {
+      const signedIn = await loginMock(candidate.user_id);
+      const from = location.state?.from?.pathname;
+      navigate(from || (signedIn.role === "ADMIN" ? "/admin" : "/"), {
+        replace: true,
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setMockPendingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!config?.configured || !buttonRef.current) return;
@@ -112,6 +137,36 @@ export default function Login() {
           ระบบจะรับเฉพาะชื่อ อีเมล และรูปโปรไฟล์จาก Google โดยไม่รับหรือจัดเก็บรหัสผ่าน
         </p>
       </div>
+
+      {config?.mock_login_enabled && (
+        <div className="card mock-login-card">
+          <div className="mock-login-heading">
+            <div>
+              <h2>ผู้ใช้ทดลอง</h2>
+              <p className="muted">เลือกบัญชีเพื่อทดสอบระบบบนเครื่องนี้โดยไม่ต้องใช้ Google</p>
+            </div>
+            <span className="mock-login-badge">DEV ONLY</span>
+          </div>
+          <div className="user-grid">
+            {mockUsers.map((candidate) => (
+              <button
+                type="button"
+                className="card user-card"
+                key={candidate.user_id}
+                disabled={mockPendingId !== null}
+                onClick={() => handleMockLogin(candidate)}
+              >
+                <Avatar url={candidate.avatar_url} size={40} />
+                <strong>{candidate.username}</strong>
+                <span className="muted small">{candidate.email}</span>
+                <div className="user-card-cta">
+                  {mockPendingId === candidate.user_id ? "กำลังเข้าสู่ระบบ…" : `เข้าใช้ในสิทธิ์ ${candidate.role}`}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

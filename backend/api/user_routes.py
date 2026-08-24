@@ -14,6 +14,10 @@ google_verifier = GoogleIdentityVerifier()
 service = UserService(google_verifier=google_verifier)
 
 
+def mock_login_enabled():
+    return os.getenv("ALLOW_MOCK_AUTH", "false").casefold() == "true"
+
+
 def invoke(operation, *args):
     try:
         return operation(*args)
@@ -30,7 +34,7 @@ def list_users():
 
 @router.post("/auth/login-mock")
 def login_mock(payload: LoginMock, request: Request):
-    if os.getenv("ALLOW_MOCK_AUTH", "false").casefold() != "true":
+    if not mock_login_enabled():
         raise HTTPException(404, "Mock login is disabled.")
     ip = request.client.host if request.client else None
     result = invoke(service.login_mock, payload.user_id, ip)
@@ -45,6 +49,7 @@ def auth_config():
         "google_client_id": google_verifier.client_id,
         "allowed_domain": google_verifier.allowed_domain,
         "configured": google_verifier.configured,
+        "mock_login_enabled": mock_login_enabled(),
     }
 
 

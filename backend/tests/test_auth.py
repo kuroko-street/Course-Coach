@@ -4,6 +4,13 @@ from auth import GoogleIdentityError, GoogleIdentityVerifier
 from api import user_routes
 
 
+def test_auth_config_exposes_development_mock_mode(client):
+    response = client.get("/api/auth/config")
+
+    assert response.status_code == 200
+    assert response.json()["mock_login_enabled"] is True
+
+
 def test_google_verifier_rejects_non_kmitl_workspace(monkeypatch):
     verifier = GoogleIdentityVerifier("test-client", "kmitl.ac.th")
     monkeypatch.setattr(

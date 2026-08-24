@@ -36,14 +36,23 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const loginMock = useCallback(async (userId) => {
+    const data = await api("/auth/login-mock", {
+      method: "POST",
+      body: { user_id: userId },
+    });
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   const logout = useCallback(async () => {
     await api("/auth/logout", { method: "POST" });
     setUser(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, login, logout, authReady, isAdmin: user?.role === "ADMIN" }),
-    [user, login, logout, authReady]
+    () => ({ user, login, loginMock, logout, authReady, isAdmin: user?.role === "ADMIN" }),
+    [user, login, loginMock, logout, authReady]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
