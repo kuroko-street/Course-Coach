@@ -50,6 +50,11 @@ export default function CourseDetail() {
   const [reviewFile, setReviewFile] = useState(null);
   const [reviewFileInputKey, setReviewFileInputKey] = useState(0);
 
+  const [plans, setPlans] = useState([]);
+  const [planAdd, setPlanAdd] = useState({ plan_id: "", academic_year: 2568, semester: "1" });
+  const [planAdding, setPlanAdding] = useState(false);
+  const [planMessage, setPlanMessage] = useState("");
+
   async function loadCourse() {
     setCourse(await api(`/courses/${id}`));
   }
@@ -66,15 +71,48 @@ export default function CourseDetail() {
     setSelectedEnrollmentId(rows.length ? String(rows[0].enrollment_id) : "");
   }
 
+  async function loadPlans() {
+    const data = await api("/plans", { userId: user?.user_id });
+    const rows = data.plans || [];
+    setPlans(rows);
+    setPlanAdd((prev) => ({ ...prev, plan_id: rows.length ? String(rows[0].plan_id) : "" }));
+  }
+
   async function loadAll() {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([loadCourse(), loadReviews(), loadEnrollments()]);
+      await Promise.all([loadCourse(), loadReviews(), loadEnrollments(), loadPlans()]);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAddToPlan(e) {
+    e.preventDefault();
+    setPlanMessage("");
+    if (!planAdd.plan_id) {
+      setPlanMessage("กรุณาสร้างแผนการเรียนก่อน (ไปที่เมนู “แผนการเรียน”)");
+      return;
+    }
+    setPlanAdding(true);
+    try {
+      await api(`/plans/${planAdd.plan_id}/items`, {
+        method: "POST",
+        userId: user.user_id,
+        body: {
+          course_id: Number(id),
+          academic_year: Number(planAdd.academic_year),
+          semester: planAdd.semester,
+        },
+      });
+      setPlanMessage("เพิ่มลงแผนการเรียนแล้ว");
+    } catch (err) {
+      setPlanMessage(err.message);
+    } finally {
+      setPlanAdding(false);
     }
   }
 
@@ -304,6 +342,57 @@ export default function CourseDetail() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Add to a study plan (Story: plan credits before real registration) */}
+      <section>
+        <h2>เพิ่มลงแผนการเรียน</h2>
+        {plans.length === 0 ? (
+          <p className="muted">
+            ยังไม่มีแผนการเรียน — ไปสร้างแผนที่เมนู{" "}
+            <Link to="/plans">แผนการเรียน</Link> ก่อน
+          </p>
+        ) : (
+          <form className="card quick-add-plan" onSubmit={handleAddToPlan}>
+            <div>
+              <label htmlFor="plan-select">แผน</label>
+              <select
+                id="plan-select"
+                value={planAdd.plan_id}
+                onChange={(e) => setPlanAdd((prev) => ({ ...prev, plan_id: e.target.value }))}
+              >
+                {plans.map((p) => (
+                  <option key={p.plan_id} value={p.plan_id}>{p.plan_name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="plan-year">ปีการศึกษา</label>
+              <input
+                id="plan-year"
+                type="number"
+                value={planAdd.academic_year}
+                onChange={(e) => setPlanAdd((prev) => ({ ...prev, academic_year: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="plan-semester">เทอม</label>
+              <select
+                id="plan-semester"
+                value={planAdd.semester}
+                onChange={(e) => setPlanAdd((prev) => ({ ...prev, semester: e.target.value }))}
+              >
+                <option value="1">เทอม 1</option>
+                <option value="2">เทอม 2</option>
+                <option value="3">เทอม 3</option>
+              </select>
+            </div>
+            <button type="submit" disabled={planAdding}>
+              {planAdding ? "กำลังเพิ่ม…" : "เพิ่มลงแผน"}
+            </button>
+          </form>
+        )}
+        {planMessage && <p className="muted small">{planMessage}</p>}
       </section>
 
       {/* Reviews */}

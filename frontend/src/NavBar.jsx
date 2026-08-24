@@ -29,6 +29,9 @@ export default function NavBar() {
           <NavLink to="/dashboard" className="nav-link">
             Dashboard
           </NavLink>
+          <NavLink to="/plans" className="nav-link">
+            แผนการเรียน
+          </NavLink>
           {isAdmin && (
             <NavLink to="/admin" className="nav-link">
               Admin Queue

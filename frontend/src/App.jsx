@@ -7,6 +7,8 @@ import CourseDetail from "./CourseDetail.jsx";
 import Admin from "./Admin.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Profile from "./Profile.jsx";
+import Plans from "./Plans.jsx";
+import PlanDetail from "./PlanDetail.jsx";
 
 /** Redirect to /login when nobody is signed in. */
 function RequireAuth({ children }) {
@@ -71,6 +73,22 @@ export default function App() {
             element={
               <RequireAuth>
                 <Profile />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/plans"
+            element={
+              <RequireAuth>
+                <Plans />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/plans/:id"
+            element={
+              <RequireAuth>
+                <PlanDetail />
               </RequireAuth>
             }
           />

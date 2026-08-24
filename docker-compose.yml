@@ -54,7 +54,9 @@ services:
     command:
       - sh
       - -c
-      - psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f /migrations/002_upgrade_sprint2.sql
+      - >-
+        psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f /migrations/002_upgrade_sprint2.sql &&
+        psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f /migrations/003_study_plans.sql
     depends_on:
       db:
         condition: service_healthy
