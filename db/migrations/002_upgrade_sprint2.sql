@@ -1,6 +1,8 @@
 -- Idempotent in-place upgrade from the original prototype schema.
 -- Safe to run on both an old populated volume and a freshly initialized DB.
 
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 ALTER TYPE audit_action ADD VALUE IF NOT EXISTS 'EDIT_REVIEW';
 ALTER TYPE audit_action ADD VALUE IF NOT EXISTS 'DELETE_REVIEW';
 ALTER TYPE audit_action ADD VALUE IF NOT EXISTS 'UPLOAD_FILE';
@@ -112,6 +114,16 @@ CREATE INDEX IF NOT EXISTS idx_review_files_review ON review_files(review_id);
 CREATE INDEX IF NOT EXISTS idx_courses_search ON courses(course_code, course_name);
 CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_course ON enrollments(course_id);
+CREATE INDEX IF NOT EXISTS idx_courses_code_trgm
+    ON courses USING GIN (course_code gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_courses_name_trgm
+    ON courses USING GIN (course_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_courses_department_trgm
+    ON courses USING GIN (department gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_instructors_name_trgm
+    ON instructors USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_tags_name_trgm
+    ON tags USING GIN (tag_name gin_trgm_ops);
 
 -- Existing reviews prove that the reviewer took that exact course offering.
 INSERT INTO enrollments (student_id, course_id, academic_year, semester, section)

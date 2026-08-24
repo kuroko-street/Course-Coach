@@ -34,7 +34,8 @@ persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
    `/api/auth/login-mock` and writes a `LOGIN` row into `audit_logs`.
    Sign in as `somchai_s` (STUDENT).
 2. **`/` Course Catalog** — search by code, name, **or tag** (e.g. try
-   `เขียนโปรแกรม`) and filter by department. Course cards show their tags;
+   `เขียนโปรแกรม`) or instructor name using PostgreSQL full-text search, and
+   filter by department. Course cards show their instructors and tags;
    clicking a tag chip (here or on the tag filter row) re-runs the search.
 3. **`/course/:id` Course Detail** — shows the deep course fields
    (prerequisites, syllabus, teaching format, workload, assessment), the
@@ -114,6 +115,11 @@ uploading a file to someone else's review, is likewise blocked in the UI
   `enrollments` table for the (student, course, year, semester, section)
   before writing — a student cannot review a course/term they were never
   enrolled in, no matter what the client sends.
+- **Hybrid full-text course search:** weighted PostgreSQL FTS handles
+  multi-word/web-style queries, prefix queries handle incomplete terms,
+  and `pg_trgm` plus an every-term fallback cover small typos and partial
+  Thai text. Exact identifiers receive the strongest relevance boost; no
+  external search server or duplicated search table is required.
 
 ## API
 
@@ -124,7 +130,7 @@ uploading a file to someone else's review, is likewise blocked in the UI
 | POST   | `/api/auth/login-mock`                | —           | Switch session user; logs `LOGIN`                       |
 | GET    | `/api/departments`                    | —           | Distinct department list (powers the filter)            |
 | GET    | `/api/tags`                           | —           | Full tag list (tag filter row / autocomplete)           |
-| GET    | `/api/courses?search=&department=`    | —           | List/search courses (search matches code, name, or tag) |
+| GET    | `/api/courses?search=&department=`    | —           | Full-text course search (code, name, department, tag, or instructor) |
 | GET    | `/api/courses/{id}`                   | —           | Course detail + instructors + tags + mock offerings     |
 | GET    | `/api/courses/{id}/reviews`           | optional¹   | `ACTIVE` reviews, with ratings/likes/comment counts      |
 | GET    | `/api/courses/{id}/enrollments/me`    | login       | Caller's own enrolled term/section for this course (drives the write-review form) |

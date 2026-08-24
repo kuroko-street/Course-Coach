@@ -4,6 +4,10 @@
 -- Engineering rule: fixed-value columns use ENUM, never VARCHAR
 -- ============================================================
 
+-- Trigram matching complements PostgreSQL FTS for partial Thai words and
+-- small typing mistakes (for example คอม -> คอมพิวเตอร์, Computor -> Computer).
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- ----------------------------------------------------------------
 -- ENUM Types (fixed-value domains)
 -- ----------------------------------------------------------------
@@ -192,6 +196,11 @@ CREATE INDEX idx_review_likes_review   ON review_likes (review_id);
 CREATE INDEX idx_review_comments_review ON review_comments (review_id);
 CREATE INDEX idx_review_files_review   ON review_files (review_id);
 CREATE INDEX idx_courses_search        ON courses (course_code, course_name);
+CREATE INDEX idx_courses_code_trgm      ON courses USING GIN (course_code gin_trgm_ops);
+CREATE INDEX idx_courses_name_trgm      ON courses USING GIN (course_name gin_trgm_ops);
+CREATE INDEX idx_courses_department_trgm ON courses USING GIN (department gin_trgm_ops);
+CREATE INDEX idx_instructors_name_trgm  ON instructors USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_tags_name_trgm         ON tags USING GIN (tag_name gin_trgm_ops);
 CREATE INDEX idx_enrollments_student   ON enrollments (student_id);
 CREATE INDEX idx_enrollments_course    ON enrollments (course_id);
 
