@@ -7,6 +7,7 @@ import CourseDetail from "./CourseDetail.jsx";
 import Admin from "./Admin.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Profile from "./Profile.jsx";
+import AllSummaryFilesPage from "./AllSummaryFilesPage.jsx";
 
 /** Redirect to /login when nobody is signed in. */
 function RequireAuth({ children }) {
@@ -55,6 +56,15 @@ export default function App() {
             element={
               <RequireAuth>
                 <CourseDetail />
+              </RequireAuth>
+            }
+          />
+          {/* เพิ่ม Route หน้าไฟล์สรุปทั้งหมดที่นี่ */}
+          <Route
+            path="/summary-files"
+            element={
+              <RequireAuth>
+                <AllSummaryFilesPage />
               </RequireAuth>
             }
           />

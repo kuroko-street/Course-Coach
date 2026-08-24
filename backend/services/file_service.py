@@ -1,85 +1,65 @@
+import os
 import uuid
-from pathlib import Path
-
-from db import get_connection
-from domain.errors import ServiceError
-from repositories.audit_log_repository import AuditLogRepository
+from fastapi import HTTPException
 from repositories.file_repository import FileRepository
-from repositories.review_repository import ReviewRepository
 
+BASE_UPLOADS_DIR = os.getenv("UPLOADS_DIR", "/app/uploads")
+ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".doc", ".ptff"}
+MAX_FILES_LIMIT = 3
 
 class FileService:
-    MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
-    CHUNK_SIZE_BYTES = 1024 * 1024
+    def __init__(self, get_db_conn):
+        self.get_db_conn = get_db_conn
+        self.repo = FileRepository()
 
-    def __init__(self, uploads_dir, connection_factory=get_connection):
-        self.uploads_dir = Path(uploads_dir)
-        self.uploads_dir.mkdir(parents=True, exist_ok=True)
-        self.connection_factory = connection_factory
-        self.reviews = ReviewRepository()
-        self.files = FileRepository()
-        self.audit = AuditLogRepository()
-
-    async def upload(self, review_id, user, upload, ip_address=None):
-        conn = self.connection_factory()
-        stored_path = None
-        try:
-            review = self.reviews.find_by_id(conn, review_id)
-            if review is None:
-                raise ServiceError(404, f"Review id {review_id} not found.")
-            if review["reviewer_id"] != user["user_id"]:
-                raise ServiceError(403, "Only the review's author can attach files to it.")
-            if review["status"] == "DELETED":
-                raise ServiceError(409, "This review has been deleted.")
-
-            original_name = Path(upload.filename or "upload").name
-            review_dir = self.uploads_dir / str(review_id)
-            review_dir.mkdir(parents=True, exist_ok=True)
-            stored_path = review_dir / f"{uuid.uuid4().hex}_{original_name}"
-            size = 0
-            with stored_path.open("wb") as destination:
-                while chunk := await upload.read(self.CHUNK_SIZE_BYTES):
-                    size += len(chunk)
-                    if size > self.MAX_FILE_SIZE_BYTES:
-                        raise ServiceError(413, "File exceeds the 20MB limit.")
-                    destination.write(chunk)
-
-            created = self.files.create(
-                conn, review_id, user["user_id"], original_name, str(stored_path), size
+    def upload_summary_files(self, course_id: int, academic_year: str, user_id: int, files: list):
+        if len(files) > MAX_FILES_LIMIT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"สามารถอัปโหลดได้สูงสุดไม่เกิน {MAX_FILES_LIMIT} ไฟล์เท่านั้น"
             )
-            self.audit.create(conn, user["user_id"], "UPLOAD_FILE", created["file_id"], ip_address)
-            conn.commit()
-            return {
-                "file_id": created["file_id"], "review_id": review_id,
-                "filename": original_name, "size_bytes": size,
-                "uploaded_at": created["uploaded_at"],
-            }
-        except Exception:
-            conn.rollback()
-            if stored_path is not None:
-                stored_path.unlink(missing_ok=True)
-            raise
-        finally:
-            conn.close()
 
-    def list_files(self, review_id):
-        conn = self.connection_factory()
-        try:
-            return {"files": self.files.list_by_review(conn, review_id)}
-        finally:
-            conn.close()
+        # 3.4 แยกโฟลเดอร์ตาม User ID และปีการศึกษา
+        safe_year = academic_year.replace("/", "_")
+        user_upload_dir = os.path.join(BASE_UPLOADS_DIR, "users", str(user_id), "courses", str(course_id), safe_year)
+        os.makedirs(user_upload_dir, exist_ok=True)
 
-    def get_download(self, file_id):
-        conn = self.connection_factory()
-        try:
-            row = self.files.find_download(conn, file_id)
-        finally:
-            conn.close()
-        if row is None:
-            raise ServiceError(404, f"File id {file_id} not found.")
-        if row["status"] == "DELETED":
-            raise ServiceError(410, "The review containing this file was deleted.")
-        path = Path(row["stored_path"])
-        if not path.is_file():
-            raise ServiceError(404, "Stored file is missing.")
-        return path, row["filename"]
+        uploaded_records = []
+
+        with self.get_db_conn() as conn:
+            for file in files:
+                file_ext = os.path.splitext(file.filename)[1].lower()
+                # 3.1 ตรวจสอบประเภทไฟล์
+                if file_ext not in ALLOWED_EXTENSIONS:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"ไฟล์ประเภท '{file_ext}' ไม่ได้รับอนุญาตเพื่อความปลอดภัย"
+                    )
+
+                stored_name = f"{uuid.uuid4().hex}{file_ext}"
+                file_path = os.path.join(user_upload_dir, stored_name)
+
+                content = file.file.read()
+                size_bytes = len(content)
+
+                with open(file_path, "wb") as f:
+                    f.write(content)
+
+                # บันทึกข้อมูลลงฐานข้อมูล
+                record = self.repo.create_summary_file(
+                    conn=conn,
+                    course_id=course_id,
+                    academic_year=academic_year,
+                    uploader_id=user_id,
+                    filename=file.filename,
+                    stored_path=file_path,
+                    size_bytes=size_bytes
+                )
+                
+                uploaded_records.append(record)
+
+        return uploaded_records
+
+    def get_summary_files(self, course_id: int, academic_year: str = None):
+        with self.get_db_conn() as conn:
+            return self.repo.list_summary_files(conn, course_id, academic_year)
