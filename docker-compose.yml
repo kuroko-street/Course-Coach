@@ -60,7 +60,7 @@ services:
     command:
       - sh
       - -c
-      - for migration in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f "$$migration" || exit 1; done
+      - until pg_isready -h db -U coursecoach -d coursecoach; do sleep 1; done; sleep 2; for migration in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f "$$migration" || exit 1; done
     depends_on:
       db:
         condition: service_healthy
