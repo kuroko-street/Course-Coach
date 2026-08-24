@@ -4,6 +4,7 @@ from repositories.course_repository import CourseRepository
 
 
 class CourseService:
+    DASHBOARD_METRICS = frozenset(CourseRepository.RANKING_COLUMNS)
     def __init__(self, connection_factory=get_connection):
         self.connection_factory = connection_factory
         self.courses = CourseRepository()
@@ -47,5 +48,17 @@ class CourseService:
     def my_enrollments(self, course_id, user_id):
         return {"enrollments": self._read(self.courses.list_my_enrollments, user_id, course_id)}
 
-    def rankings(self):
-        return {"rankings": self._read(self.courses.rankings)}
+    def dashboard_summary(self):
+        return {"summary": self._read(self.courses.dashboard_summary)}
+
+    def rankings(self, metric="reviews", department=None, min_reviews=0):
+        if metric not in self.DASHBOARD_METRICS:
+            raise ServiceError(400, f"Unsupported dashboard metric: {metric}.")
+        return {
+            "metric": metric,
+            "department": department or None,
+            "min_reviews": min_reviews,
+            "rankings": self._read(
+                self.courses.rankings, metric, department, min_reviews
+            ),
+        }

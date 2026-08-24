@@ -779,6 +779,95 @@ a.tag-chip:hover,
 }
 
 /* ---- Dashboard ranking ---- */
+.dashboard-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.dashboard-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.dashboard-summary-card strong {
+  color: var(--brand);
+  font-size: 24px;
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 20px 0 12px;
+}
+
+.dashboard-tabs button {
+  background: #fff;
+  color: #444;
+  border: 1px solid var(--border);
+}
+
+.dashboard-tabs button.dashboard-tab-active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.dashboard-controls {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dashboard-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #555;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dashboard-controls select {
+  min-width: 170px;
+}
+
+.dashboard-ranking-heading {
+  margin-top: 22px;
+}
+
+.dashboard-ranking-heading h2 {
+  margin-bottom: 6px;
+}
+
+.dashboard-empty {
+  color: var(--muted);
+  text-align: center;
+}
+
+.dashboard-refresh-slot {
+  min-height: 22px;
+  padding: 2px 4px;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.ranking-list-refreshing {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .ranking-list {
   display: grid;
   gap: 10px;
@@ -811,7 +900,7 @@ a.tag-chip:hover,
 
 .ranking-stats {
   display: flex;
-  gap: 18px;
+  gap: 14px;
 }
 
 .ranking-stat {
@@ -819,6 +908,17 @@ a.tag-chip:hover,
   flex-direction: column;
   align-items: center;
   font-size: 14px;
+}
+
+.ranking-stat-primary {
+  min-width: 82px;
+  padding: 6px 8px;
+  background: var(--brand-soft);
+  border-radius: 6px;
+}
+
+.ranking-stat-primary strong {
+  color: var(--brand);
 }
 
 /* ---- Profile page ---- */
@@ -899,6 +999,16 @@ a.tag-chip:hover,
 
   .ranking-stats {
     width: 100%;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-controls label,
+  .dashboard-controls select {
+    width: 100%;
   }
 }

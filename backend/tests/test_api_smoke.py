@@ -8,6 +8,7 @@ def test_public_read_endpoints(client):
         "/api/courses/1",
         "/api/courses/1/reviews",
         "/api/dashboard/rankings",
+        "/api/dashboard/summary",
         "/api/users/1/profile",
     ]
     for path in cases:

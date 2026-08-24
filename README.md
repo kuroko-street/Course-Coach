@@ -59,9 +59,10 @@ persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
      attached, downloadable by anyone.
    - Hit **⚑ Report** on a review **five times**: on the fifth report the
      review is auto-hidden and vanishes from the list.
-4. **`/dashboard`** — popularity ranking across all courses, by average
-   satisfaction rating (ties broken by review count), with total likes as
-   a secondary signal.
+4. **`/dashboard`** — summary cards plus separate rankings for review count,
+   engagement (likes), and all six rating aspects. Rankings can be filtered
+   by department and minimum review count. The recommendation-score tab is
+   deliberately disabled until the scoring policy is agreed.
 5. **`/profile/:id`** — click a reviewer's name anywhere (or your own
    username in the navbar) to see their avatar, average rating per aspect,
    total likes received, and full review history. On your **own** profile
@@ -145,7 +146,8 @@ uploading a file to someone else's review, is likewise blocked in the UI
 | POST   | `/api/reviews/{id}/files`             | own review  | Attach a file (multipart, 20MB cap)                      |
 | GET    | `/api/reviews/{id}/files`             | —           | List a review's attachments                              |
 | GET    | `/api/files/{id}/download`            | —           | Download an attachment                                   |
-| GET    | `/api/dashboard/rankings`             | —           | Popularity ranking across all courses                    |
+| GET    | `/api/dashboard/rankings?metric=&department=&min_reviews=` | — | Dashboard rankings by engagement or rating aspect |
+| GET    | `/api/dashboard/summary`              | —           | Dashboard totals for courses, active reviews, reviewers, likes and comments |
 | GET    | `/api/users/{id}/profile`             | —           | Reviewer profile: averages, total likes, review history   |
 | GET    | `/api/users/{id}/enrollments`         | self-only   | "วิชาที่มีสิทธิ์รีวิว": every course/term the user is enrolled in + reviewed flag |
 | GET    | `/api/admin/reports`                  | ADMIN       | Moderation queue (`HIDDEN` reviews)                       |

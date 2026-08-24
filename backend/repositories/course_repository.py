@@ -218,18 +218,108 @@ class CourseRepository:
             )
             return cur.fetchall()
 
-    def rankings(self, conn):
+    RANKING_COLUMNS = {
+        "reviews": "review_count",
+        "likes": "total_likes",
+        "comments": "total_comments",
+        "satisfaction": "avg_satisfaction",
+        "difficulty": "avg_difficulty",
+        "workload": "avg_workload",
+        "content": "avg_content",
+        "teaching": "avg_teaching",
+        "exam": "avg_exam",
+    }
+
+    def dashboard_summary(self, conn):
         with dict_cursor(conn) as cur:
             cur.execute(
                 """
-                SELECT c.course_id, c.course_code, c.course_name, c.department,
-                       (SELECT COUNT(*) FROM reviews r WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS review_count,
-                       (SELECT ROUND(AVG(r.rating_satisfaction)::numeric, 2) FROM reviews r
-                        WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS avg_satisfaction,
-                       (SELECT COUNT(*) FROM review_likes rl JOIN reviews r ON r.review_id = rl.review_id
-                        WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS total_likes
-                FROM courses c
-                ORDER BY avg_satisfaction DESC NULLS LAST, review_count DESC, c.course_code;
+                SELECT
+                    (SELECT COUNT(*) FROM courses) AS course_count,
+                    (SELECT COUNT(*) FROM reviews WHERE status = 'ACTIVE') AS review_count,
+                    (SELECT COUNT(DISTINCT reviewer_id) FROM reviews
+                     WHERE status = 'ACTIVE') AS reviewer_count,
+                    (SELECT COUNT(*) FROM review_likes rl
+                     JOIN reviews r ON r.review_id = rl.review_id
+                     WHERE r.status = 'ACTIVE') AS total_likes,
+                    (SELECT COUNT(*) FROM review_comments rc
+                     JOIN reviews r ON r.review_id = rc.review_id
+                     WHERE r.status = 'ACTIVE') AS total_comments,
+                    (SELECT ROUND(AVG(rating_satisfaction)::numeric, 2)
+                     FROM reviews WHERE status = 'ACTIVE') AS avg_satisfaction;
                 """
+            )
+            return cur.fetchone()
+
+    def rankings(self, conn, metric="reviews", department=None, min_reviews=0):
+        metric_source = {
+            "reviews": "COALESCE(rs.review_count, 0)",
+            "likes": "COALESCE(ls.total_likes, 0)",
+            "comments": "COALESCE(cs.total_comments, 0)",
+            "satisfaction": "rs.avg_satisfaction",
+            "difficulty": "rs.avg_difficulty",
+            "workload": "rs.avg_workload",
+            "content": "rs.avg_content",
+            "teaching": "rs.avg_teaching",
+            "exam": "rs.avg_exam",
+        }[metric]
+        clauses, params = ["COALESCE(rs.review_count, 0) >= %s"], [min_reviews]
+        if department and department.strip():
+            clauses.append("c.department = %s")
+            params.append(department.strip())
+        where = " AND ".join(clauses)
+
+        if metric == "reviews":
+            tie_breakers = "avg_satisfaction DESC NULLS LAST, c.course_code"
+        elif metric in {"likes", "comments"}:
+            tie_breakers = "review_count DESC, avg_satisfaction DESC NULLS LAST, c.course_code"
+        else:
+            tie_breakers = "review_count DESC, c.course_code"
+
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                f"""
+                WITH review_stats AS (
+                    SELECT course_id,
+                           COUNT(*) AS review_count,
+                           COUNT(DISTINCT reviewer_id) AS reviewer_count,
+                           ROUND(AVG(rating_satisfaction)::numeric, 2) AS avg_satisfaction,
+                           ROUND(AVG(rating_difficulty)::numeric, 2) AS avg_difficulty,
+                           ROUND(AVG(rating_workload)::numeric, 2) AS avg_workload,
+                           ROUND(AVG(rating_content)::numeric, 2) AS avg_content,
+                           ROUND(AVG(rating_teaching)::numeric, 2) AS avg_teaching,
+                           ROUND(AVG(rating_exam)::numeric, 2) AS avg_exam
+                    FROM reviews
+                    WHERE status = 'ACTIVE'
+                    GROUP BY course_id
+                ), like_stats AS (
+                    SELECT r.course_id, COUNT(*) AS total_likes
+                    FROM review_likes rl
+                    JOIN reviews r ON r.review_id = rl.review_id
+                    WHERE r.status = 'ACTIVE'
+                    GROUP BY r.course_id
+                ), comment_stats AS (
+                    SELECT r.course_id, COUNT(*) AS total_comments
+                    FROM review_comments rc
+                    JOIN reviews r ON r.review_id = rc.review_id
+                    WHERE r.status = 'ACTIVE'
+                    GROUP BY r.course_id
+                )
+                SELECT c.course_id, c.course_code, c.course_name, c.department,
+                       COALESCE(rs.review_count, 0) AS review_count,
+                       COALESCE(rs.reviewer_count, 0) AS reviewer_count,
+                       rs.avg_satisfaction, rs.avg_difficulty, rs.avg_workload,
+                       rs.avg_content, rs.avg_teaching, rs.avg_exam,
+                       COALESCE(ls.total_likes, 0) AS total_likes,
+                       COALESCE(cs.total_comments, 0) AS total_comments,
+                       {metric_source} AS metric_value
+                FROM courses c
+                LEFT JOIN review_stats rs ON rs.course_id = c.course_id
+                LEFT JOIN like_stats ls ON ls.course_id = c.course_id
+                LEFT JOIN comment_stats cs ON cs.course_id = c.course_id
+                WHERE {where}
+                ORDER BY metric_value DESC NULLS LAST, {tie_breakers};
+                """,
+                params,
             )
             return cur.fetchall()
