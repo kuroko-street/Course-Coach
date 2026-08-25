@@ -111,9 +111,6 @@ export default function Dashboard() {
             {tab.label}
           </button>
         ))}
-        <button type="button" disabled title="กำลังรอเกณฑ์คะแนนจากทีมที่รับผิดชอบ">
-          วิชาแนะนำ — รอเกณฑ์
-        </button>
       </div>
 
       <div className="dashboard-controls">
