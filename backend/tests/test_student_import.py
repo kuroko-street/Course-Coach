@@ -7,8 +7,8 @@ def test_admin_import_creates_review_eligibility_and_google_links_same_account(
     email = student_import_cleanup["email"]
     student_number = student_import_cleanup["student_number"]
     csv_body = (
-        "student_number,email,course_code,academic_year,semester,section\n"
-        f"{student_number},{email},CS101,2568,1,1\n"
+        "student_name,student_number,email,course_code,academic_year,semester,section\n"
+        f"นักศึกษาทดสอบ,{student_number},{email},CS101,2568,1,1\n"
     )
     admin_headers = {"X-User-Id": "3"}
 
@@ -34,11 +34,12 @@ def test_admin_import_creates_review_eligibility_and_google_links_same_account(
 
     with db_conn.cursor() as cur:
         cur.execute(
-            "SELECT user_id, google_sub FROM users WHERE student_number = %s",
+            "SELECT user_id, google_sub, username FROM users WHERE student_number = %s",
             (student_number,),
         )
-        user_id, google_sub = cur.fetchone()
+        user_id, google_sub, username = cur.fetchone()
         assert google_sub is None
+        assert username == "นักศึกษาทดสอบ"
         cur.execute(
             "SELECT COUNT(*) FROM enrollments WHERE student_id = %s",
             (user_id,),

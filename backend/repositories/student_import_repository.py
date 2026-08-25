@@ -68,8 +68,8 @@ class StudentImportRepository:
             )
             return cur.fetchone()
 
-    def create_student(self, conn, student_number, email):
-        base = student_number
+    def create_student(self, conn, student_number, email, student_name=None):
+        base = (student_name or student_number).strip()[:100]
         username = base
         suffix = 1
         with dict_cursor(conn) as cur:
@@ -78,7 +78,7 @@ class StudentImportRepository:
                 if cur.fetchone() is None:
                     break
                 suffix += 1
-                username = f"{base}-{suffix}"
+                username = f"{base[:95]}-{suffix}"
             cur.execute(
                 f"""
                 INSERT INTO users (username, email, student_number, role, is_mock)

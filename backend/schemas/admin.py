@@ -63,6 +63,7 @@ class CourseImportRequest(BaseModel):
 
 class StudentEnrollmentImportRow(BaseModel):
     row_number: int = Field(ge=2)
+    student_name: str | None = Field(default=None, max_length=100)
     student_number: str = Field(pattern=r"^\d{8}$")
     email: str = Field(pattern=r"^[^@\s]+@kmitl\.ac\.th$", max_length=255)
     course_code: str = Field(min_length=2, max_length=20)

@@ -46,6 +46,7 @@ class StudentImportService:
         for row_number, values in raw_rows:
             normalized = {
                 "row_number": row_number,
+                "student_name": self._text(values.get("student_name")) or None,
                 "student_number": self._student_number(values.get("student_number")),
                 "email": self._text(values.get("email")).casefold(),
                 "course_code": self._text(values.get("course_code")).upper(),
@@ -108,7 +109,9 @@ class StudentImportService:
 
                 user = state["user"]
                 if user is None:
-                    user = self.students.create_student(conn, row.student_number, row.email)
+                    user = self.students.create_student(
+                        conn, row.student_number, row.email, row.student_name
+                    )
                 elif not user["student_number"]:
                     user = self.students.attach_student_number(conn, user["user_id"], row.student_number)
 
