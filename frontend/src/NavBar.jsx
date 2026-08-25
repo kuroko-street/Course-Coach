@@ -43,7 +43,7 @@ export default function NavBar() {
           {user ? (
             <>
               <Link to={`/profile/${user.user_id}`} className="nav-username">
-                {user.username}
+                {user.display_name}
                 <span className={`role-pill role-${user.role.toLowerCase()}`}>
                   {user.role}
                 </span>

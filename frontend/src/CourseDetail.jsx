@@ -307,20 +307,14 @@ export default function CourseDetail() {
           <h2>อาจารย์ผู้สอน</h2>
           <div className="instructor-grid">
             {course.instructors.map((inst) => (
-              <div className="card instructor-card" key={inst.instructor_id}>
+              <Link
+                to={`/instructor/${inst.instructor_id}`}
+                className="card instructor-card instructor-card-link"
+                key={inst.instructor_id}
+              >
                 <strong>{inst.name}</strong>
                 {inst.bio && <p className="muted small">{inst.bio}</p>}
-                {inst.teaching_style && (
-                  <p>
-                    <span className="meta-label">สไตล์การสอน:</span> {inst.teaching_style}
-                  </p>
-                )}
-                {inst.grading_style && (
-                  <p>
-                    <span className="meta-label">การให้คะแนน:</span> {inst.grading_style}
-                  </p>
-                )}
-              </div>
+              </Link>
             ))}
           </div>
         </section>
@@ -476,7 +470,7 @@ export default function CourseDetail() {
 
             <div className="form-footer">
               <span className="meta">
-                กำลังเขียนในนาม <strong>{user.username}</strong>
+                กำลังเขียนในนาม <strong>{user.display_name}</strong>
               </span>
               <button type="submit" disabled={submitting}>
                 {submitting ? "กำลังส่ง…" : "ส่งรีวิว"}

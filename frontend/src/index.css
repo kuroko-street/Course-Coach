@@ -848,6 +848,16 @@ a.tag-chip:hover,
   font-size: 14px;
 }
 
+.instructor-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.instructor-card-link:hover {
+  border-color: var(--brand);
+}
+
 .meta-label {
   font-weight: 600;
   color: var(--muted);

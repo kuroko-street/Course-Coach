@@ -108,7 +108,8 @@ class ReviewRepository:
             cur.execute(
                 """
                 SELECT rc.comment_id, rc.review_id, rc.content, rc.created_at,
-                       u.user_id AS author_id, u.username AS author_name,
+                       u.user_id AS author_id,
+                       COALESCE(NULLIF(u.display_name, ''), u.username) AS author_name,
                        u.avatar_url AS author_avatar
                 FROM review_comments rc
                 JOIN users u ON u.user_id = rc.user_id

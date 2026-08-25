@@ -38,6 +38,11 @@ def get_course(course_id: int):
     return invoke(service.detail, course_id)
 
 
+@router.get("/instructors/{instructor_id}/profile")
+def get_instructor_profile(instructor_id: int):
+    return invoke(service.instructor_profile, instructor_id)
+
+
 @router.get("/courses/{course_id}/reviews")
 def list_course_reviews(
     course_id: int,

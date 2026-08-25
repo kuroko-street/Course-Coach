@@ -24,6 +24,7 @@ services:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./db/migrations/002_upgrade_sprint2.sql:/docker-entrypoint-initdb.d/migrate_002_upgrade_sprint2.sql:ro
       - ./db/migrations/003_study_plans.sql:/docker-entrypoint-initdb.d/migrate_003_study_plans.sql:ro
+      - ./db/migrations/008_user_display_name.sql:/docker-entrypoint-initdb.d/migrate_008_user_display_name.sql:ro
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
@@ -43,6 +44,7 @@ services:
       DB_USER: coursecoach
       DB_PASSWORD: coursecoach_pass
       UPLOADS_DIR: /tmp/coursecoach-test-uploads
+      AVATARS_DIR: /tmp/coursecoach-test-avatars
       ALLOW_MOCK_AUTH: "true"
       SESSION_SECRET: coursecoach-test-session-secret
     depends_on:

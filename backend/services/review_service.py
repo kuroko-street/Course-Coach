@@ -140,7 +140,7 @@ class ReviewService:
             conn.commit()
             return {
                 "comment_id": created["comment_id"], "review_id": review_id,
-                "author_id": user["user_id"], "author_name": user["username"],
+                "author_id": user["user_id"], "author_name": user["display_name"],
                 "author_avatar": user["avatar_url"], "content": content,
                 "created_at": created["created_at"],
             }
