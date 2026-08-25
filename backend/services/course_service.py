@@ -42,6 +42,13 @@ class CourseService:
         return {**course, "instructors": instructors, "tags": tags, "averages": averages,
                 "offerings": self.mock_offerings(course_id)}
 
+    def instructor_profile(self, instructor_id):
+        result = self._read(self.courses.get_instructor_profile, instructor_id)
+        if result is None:
+            raise ServiceError(404, f"Instructor id {instructor_id} not found.")
+        instructor, courses = result
+        return {"instructor": instructor, "courses": courses}
+
     def reviews(self, course_id, caller_id=None):
         return {"reviews": self._read(self.courses.list_reviews, course_id, caller_id)}
 

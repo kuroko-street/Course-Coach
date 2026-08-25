@@ -848,6 +848,16 @@ a.tag-chip:hover,
   font-size: 14px;
 }
 
+.instructor-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.instructor-card-link:hover {
+  border-color: var(--brand);
+}
+
 .meta-label {
   font-weight: 600;
   color: var(--muted);
@@ -1238,6 +1248,194 @@ a.tag-chip:hover,
 .enrollment-pending {
   background: #e8f5e9;
   color: var(--success);
+}
+
+/* ---- Study plans (/plans, /plans/:id) ---- */
+.plan-list {
+  display: grid;
+  gap: 10px;
+}
+
+.plan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.plan-card:hover {
+  border-color: var(--brand);
+}
+
+.plan-card strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.plan-create-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.term-block {
+  margin-bottom: 16px;
+}
+
+.term-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.term-title {
+  font-weight: 700;
+}
+
+.term-credits {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.term-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.warning-badge {
+  display: inline-block;
+  background: #fff3e0;
+  color: #b26a00;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prereq-badge {
+  background: #fdecea;
+  color: var(--danger);
+}
+
+.plan-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-item-info {
+  min-width: 0;
+}
+
+.plan-item-ratings {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.plan-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plan-item-actions select,
+.plan-item-actions input {
+  width: auto;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.plan-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-add-plan {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+@media (max-width: 560px) {
+  .quick-add-plan {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Course picker (search + department, add-to-plan) ---- */
+.course-picker {
+  display: flex;
+  flex-direction: column;
+}
+
+.course-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.course-search-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.course-search-item:hover {
+  border-color: var(--brand);
+}
+
+.selected-course-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  background: #f4f6fd;
+  margin-bottom: 12px;
+}
+
+.add-item-term-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+@media (max-width: 560px) {
+  .add-item-term-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {

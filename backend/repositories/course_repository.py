@@ -186,12 +186,38 @@ class CourseRepository:
             averages = cur.fetchone()
         return course, instructors, tags, averages
 
+    def get_instructor_profile(self, conn, instructor_id):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT instructor_id, name, bio, teaching_style, grading_style
+                FROM instructors WHERE instructor_id = %s;
+                """,
+                (instructor_id,),
+            )
+            instructor = cur.fetchone()
+            if instructor is None:
+                return None
+            cur.execute(
+                """
+                SELECT c.course_id, c.course_code, c.course_name, c.department
+                FROM courses c
+                JOIN course_instructors ci ON ci.course_id = c.course_id
+                WHERE ci.instructor_id = %s AND c.is_active = TRUE
+                ORDER BY c.course_code;
+                """,
+                (instructor_id,),
+            )
+            courses = cur.fetchall()
+        return instructor, courses
+
     def list_reviews(self, conn, course_id, caller_id=None):
         with dict_cursor(conn) as cur:
             cur.execute(
                 f"""
                 SELECT {REVIEW_FIELDS}, c.course_code, c.course_name, c.department,
-                       u.username AS reviewer_name, u.avatar_url AS reviewer_avatar,
+                       COALESCE(NULLIF(u.display_name, ''), u.username) AS reviewer_name,
+                       u.avatar_url AS reviewer_avatar,
                        (SELECT COUNT(*) FROM review_likes rl WHERE rl.review_id = r.review_id) AS like_count,
                        (SELECT COUNT(*) FROM review_comments rc WHERE rc.review_id = r.review_id) AS comment_count,
                        EXISTS(SELECT 1 FROM review_likes rl2

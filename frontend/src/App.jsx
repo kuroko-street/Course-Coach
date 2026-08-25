@@ -7,6 +7,9 @@ import CourseDetail from "./CourseDetail.jsx";
 import Admin from "./Admin.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Profile from "./Profile.jsx";
+import Instructor from "./Instructor.jsx";
+import Plans from "./Plans.jsx";
+import PlanDetail from "./PlanDetail.jsx";
 
 /** Redirect to /login when nobody is signed in. */
 function RequireAuth({ children }) {
@@ -28,7 +31,7 @@ function RequireAdmin({ children }) {
       <section>
         <div className="alert alert-error">
           หน้านี้สำหรับผู้ดูแลระบบเท่านั้น — you are signed in as{" "}
-          <strong>{user.username}</strong> ({user.role}). Switch to an ADMIN
+          <strong>{user.display_name}</strong> ({user.role}). Switch to an ADMIN
           account to open the moderation queue.
         </div>
       </section>
@@ -73,6 +76,30 @@ export default function App() {
             element={
               <RequireAuth>
                 <Profile />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/instructor/:id"
+            element={
+              <RequireAuth>
+                <Instructor />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/plans"
+            element={
+              <RequireAuth>
+                <Plans />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/plans/:id"
+            element={
+              <RequireAuth>
+                <PlanDetail />
               </RequireAuth>
             }
           />

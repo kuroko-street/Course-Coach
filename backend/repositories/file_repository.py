@@ -19,7 +19,7 @@ class FileRepository:
             cur.execute(
                 """
                 SELECT rf.file_id, rf.review_id, rf.filename, rf.size_bytes, rf.uploaded_at,
-                       u.username AS uploader_name
+                       COALESCE(NULLIF(u.display_name, ''), u.username) AS uploader_name
                 FROM review_files rf
                 JOIN users u ON u.user_id = rf.uploader_id
                 WHERE rf.review_id = %s

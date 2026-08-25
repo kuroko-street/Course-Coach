@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LoginMock(BaseModel):
@@ -7,3 +7,9 @@ class LoginMock(BaseModel):
 
 class GoogleLogin(BaseModel):
     credential: str = Field(..., min_length=1)
+
+
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str = Field(..., min_length=1, max_length=100)

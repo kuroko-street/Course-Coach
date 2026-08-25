@@ -29,6 +29,9 @@ export default function NavBar() {
           <NavLink to="/dashboard" className="nav-link">
             Dashboard
           </NavLink>
+          <NavLink to="/plans" className="nav-link">
+            แผนการเรียน
+          </NavLink>
           {isAdmin && (
             <NavLink to="/admin" className="nav-link">
               Admin Queue
@@ -40,7 +43,7 @@ export default function NavBar() {
           {user ? (
             <>
               <Link to={`/profile/${user.user_id}`} className="nav-username">
-                {user.username}
+                {user.display_name}
                 <span className={`role-pill role-${user.role.toLowerCase()}`}>
                   {user.role}
                 </span>

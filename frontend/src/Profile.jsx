@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "./api.js";
+import { api, apiUpload } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
-import { RATING_FIELDS, RATING_LABELS, StarDisplay } from "./RatingStars.jsx";
 import Avatar from "./Avatar.jsx";
 
 /**
  * /profile/:id — FR-11/FR-15/FR-16: reviewer profile page.
  *
- * Shows the author's avatar/name/credit, their average score per rating
- * aspect across their own ACTIVE reviews, total likes received, and their
+ * Shows the author's avatar/name/credit, total likes received, and their
  * full review history (each linking back to the course).
  *
  * When you're looking at your OWN profile, an extra section lists every
@@ -20,13 +18,48 @@ import Avatar from "./Avatar.jsx";
  */
 export default function Profile() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [enrollments, setEnrollments] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [renamingName, setRenamingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const isOwnProfile = user?.user_id === Number(id);
+
+  async function handleRenameSubmit(e) {
+    e.preventDefault();
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    setError("");
+    try {
+      const data = await api("/users/me", { method: "PUT", body: { display_name: trimmed } });
+      setProfile((prev) => ({ ...prev, user: { ...prev.user, display_name: data.user.display_name } }));
+      updateUser({ display_name: data.user.display_name });
+      setRenamingName(false);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    setError("");
+    try {
+      const data = await apiUpload("/users/me/avatar", { file });
+      setProfile((prev) => ({ ...prev, user: { ...prev.user, avatar_url: data.user.avatar_url } }));
+      updateUser({ avatar_url: data.user.avatar_url });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = "";
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -61,7 +94,7 @@ export default function Profile() {
     );
   }
 
-  const { user: profileUser, averages, total_likes, review_count, reviews } = profile;
+  const { user: profileUser, total_likes, review_count, reviews } = profile;
 
   return (
     <>
@@ -69,10 +102,63 @@ export default function Profile() {
         ← Back to catalog
       </Link>
 
+      {error && <div className="alert alert-error">{error}</div>}
+
       <section className="profile-header">
-        <Avatar url={profileUser.avatar_url} size={64} />
+        <div style={{ position: "relative" }}>
+          <Avatar url={profileUser.avatar_url} size={64} />
+          {isOwnProfile && (
+            <label
+              title="เปลี่ยนรูปโปรไฟล์"
+              style={{
+                position: "absolute", bottom: -4, right: -4, cursor: "pointer",
+                background: "var(--brand)", color: "#fff", borderRadius: "50%",
+                width: 22, height: 22, display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: 12,
+              }}
+            >
+              {avatarUploading ? "…" : "✎"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleAvatarChange}
+                disabled={avatarUploading}
+                hidden
+              />
+            </label>
+          )}
+        </div>
         <div>
-          <h1 className="course-title">{profileUser.username}</h1>
+          {renamingName ? (
+            <form onSubmit={handleRenameSubmit} style={{ display: "flex", gap: 8 }}>
+              <input
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                maxLength={100}
+                autoFocus
+              />
+              <button type="submit">บันทึก</button>
+              <button type="button" className="btn-ghost" onClick={() => setRenamingName(false)}>
+                ยกเลิก
+              </button>
+            </form>
+          ) : (
+            <>
+              <h1 className="course-title">{profileUser.display_name}</h1>
+              {isOwnProfile && (
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => {
+                    setNameDraft(profileUser.display_name);
+                    setRenamingName(true);
+                  }}
+                >
+                  เปลี่ยนชื่อ
+                </button>
+              )}
+            </>
+          )}
           <span className={`role-pill role-${profileUser.role.toLowerCase()}`}>
             {profileUser.role}
           </span>
@@ -91,23 +177,6 @@ export default function Profile() {
           </div>
         </div>
       </section>
-
-      {review_count > 0 && (
-        <section>
-          <h2>คะแนนเฉลี่ยที่เคยให้</h2>
-          <div className="card rating-breakdown">
-            {RATING_FIELDS.map((f) => (
-              <div className="rating-row" key={f}>
-                <span className="rating-label">{RATING_LABELS[f]}</span>
-                <span>
-                  <StarDisplay value={Math.round(Number(averages[`avg_${f}`]) || 0)} />
-                  <span className="muted small"> ({averages[`avg_${f}`] ?? "–"})</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {isOwnProfile && (
         <section>

@@ -47,6 +47,7 @@ services:
     volumes:
       # Review attachments (FR-9/FR-10) persisted outside the container.
       - uploads_data:/app/uploads
+      - avatars_data:/app/avatars
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -82,3 +83,4 @@ services:
 volumes:
   db_data:
   uploads_data:
+  avatars_data:
