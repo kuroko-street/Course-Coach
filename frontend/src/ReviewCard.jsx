@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, apiUpload, fileDownloadUrl } from "./api.js";
-import { RatingBreakdown, RatingForm, ratingsFromReview } from "./RatingStars.jsx";
+import {RatingBreakdown,RatingForm,ratingsFromReview,StarDisplay,} from "./RatingStars.jsx";
 import Avatar from "./Avatar.jsx";
 
 const MAX_FILE_MB = 20;
@@ -28,6 +28,7 @@ export default function ReviewCard({
   onUpdated,
 }) {
   const isOwner = user && user.user_id === review.reviewer_id;
+  const reviewRatings = ratingsFromReview(review);
 
   const [liked, setLiked] = useState(Boolean(review.liked_by_me));
   const [likeCount, setLikeCount] = useState(Number(review.like_count) || 0);
@@ -40,13 +41,15 @@ export default function ReviewCard({
   const [files, setFiles] = useState([]);
 
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState(() => ({
-    content: review.content,
-    academic_year: String(review.academic_year),
-    semester: review.semester,
-    section: review.section,
-    ratings: ratingsFromReview(review),
-  }));
+  const [showRatings, setShowRatings] = useState(false);
+ const [editForm, setEditForm] = useState(() => ({
+  content: review.content,
+  academic_year: String(review.academic_year),
+  semester: review.semester,
+  section: review.section,
+  ratings: ratingsFromReview(review),
+  difficulty: Number(review.rating_difficulty) || 3,
+}));
   const [editFile, setEditFile] = useState(null);
   const [editFileInputKey, setEditFileInputKey] = useState(0);
   const [editBusy, setEditBusy] = useState(false);
@@ -113,6 +116,7 @@ export default function ReviewCard({
       semester: review.semester,
       section: review.section,
       ratings: ratingsFromReview(review),
+      difficulty: Number(review.rating_difficulty) || 3,
     });
     setEditFile(null);
     setError("");
@@ -137,13 +141,16 @@ export default function ReviewCard({
       academic_year: Number(editForm.academic_year),
       semester: editForm.semester.trim(),
       section: editForm.section.trim(),
+
       rating_satisfaction: editForm.ratings.satisfaction,
-      rating_difficulty: editForm.ratings.difficulty,
+      rating_skill: editForm.ratings.skill,
       rating_workload: editForm.ratings.workload,
       rating_content: editForm.ratings.content,
       rating_teaching: editForm.ratings.teaching,
       rating_exam: editForm.ratings.exam,
-    };
+      rating_recommendation: editForm.ratings.recommendation,
+      rating_difficulty: editForm.difficulty,
+};
     try {
       await api(`/reviews/${review.review_id}`, {
         method: "PUT",
@@ -265,110 +272,242 @@ export default function ReviewCard({
   }
 
   return (
-    <div className="card review-card">
-      <p className="review-content">{review.content}</p>
+  <div className="card review-card">
+  {/* ฝั่งซ้าย */}
+  <div className="review-main">
+    <div className="review-summary-top">
+      <p className="review-content">
+        "{review.content}"
+      </p>
 
-      <RatingBreakdown ratings={ratingsFromReview(review)} />
+      <button
+        type="button"
+        className={`review-expand-btn ${showRatings ? "open" : ""}`}
+        onClick={() => setShowRatings((prev) => !prev)}
+        aria-expanded={showRatings}
+        aria-label={
+          showRatings
+            ? "ซ่อนรายละเอียดคะแนน"
+            : "ดูรายละเอียดคะแนน"
+        }
+      >
+        ›
+      </button>
+    </div>
 
-      <div className="review-footer">
-        <div className="meta reviewer-meta">
-          โดย{" "}
-          <Link to={`/profile/${review.reviewer_id}`} className="reviewer-link">
-            <Avatar url={review.reviewer_avatar} size={18} />
-            {review.reviewer_name}
-          </Link>{" "}
-          · {review.academic_year}/{review.semester} · sec {review.section}
-          {review.edited_at && <span className="muted small-inline"> · แก้ไขแล้ว</span>}
-          {review.report_count > 0 && (
-            <span className="report-count"> · reported {review.report_count}/5</span>
-          )}
-        </div>
+   <span className="review-rating-title">
+      ความพึงพอใจโดยรวม
+  </span>
 
-        <div className="review-actions">
-          <button
-            type="button"
-            className={`btn btn-like ${liked ? "btn-like-active" : ""}`}
-            onClick={toggleLike}
-            disabled={!user || likeBusy}
-            title={user ? "ถูกใจรีวิวนี้" : "เข้าสู่ระบบเพื่อกดถูกใจ"}
-          >
-            {liked ? "♥" : "♡"} {likeCount}
-          </button>
+    <div className="rating-score">
+      <StarDisplay
+        value={Math.round(Number(reviewRatings.satisfaction))}
+      />
 
-          {isOwner && (
-            <>
-              <button type="button" className="btn btn-ghost" onClick={startEdit}>
-                ✎ แก้ไข
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger-outline"
-                onClick={handleDelete}
-                disabled={deleteBusy}
-              >
-                {deleteBusy ? "…" : "🗑 ลบ"}
-              </button>
-            </>
-          )}
+      <strong>
+        {Number(reviewRatings.satisfaction).toFixed(1)}
+      </strong>
+    </div>
+    
 
-          <button
-            type="button"
-            className="btn btn-danger-outline"
-            onClick={() => onReport(review.review_id)}
-            disabled={reportingId !== null}
-          >
-            {reportingId === review.review_id ? "Reporting…" : "⚑ Report"}
-          </button>
+    {/* Footer เดิม */}
+    <div className="review-footer">
+      <div className="meta reviewer-meta">
+        โดย{" "}
+
+        <Link
+          to={`/profile/${review.reviewer_id}`}
+          className="reviewer-link"
+        >
+          <Avatar
+            url={review.reviewer_avatar}
+            size={18}
+          />
+
+          {review.reviewer_name}
+        </Link>{" "}
+
+        · {review.academic_year}/{review.semester}
+        · sec {review.section}
+
+        {review.edited_at && (
+          <span className="muted small-inline">
+            {" "}· แก้ไขแล้ว
+          </span>
+        )}
+
+        {review.report_count > 0 && (
+          <span className="report-count">
+            {" "}· reported {review.report_count}/5
+          </span>
+        )}
+      </div>
+
+      <div className="review-actions">
+        <button
+          type="button"
+          className={`btn btn-like ${
+            liked ? "btn-like-active" : ""
+          }`}
+          onClick={toggleLike}
+          disabled={!user || likeBusy}
+          title={
+            user
+              ? "ถูกใจรีวิวนี้"
+              : "เข้าสู่ระบบเพื่อกดถูกใจ"
+          }
+        >
+          {liked ? "♥" : "♡"} {likeCount}
+        </button>
+
+        {isOwner && (
+          <>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={startEdit}
+            >
+              ✎ แก้ไข
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-danger-outline"
+              onClick={handleDelete}
+              disabled={deleteBusy}
+            >
+              {deleteBusy ? "…" : "🗑 ลบ"}
+            </button>
+          </>
+        )}
+
+        <button
+          type="button"
+          className="btn btn-danger-outline"
+          onClick={() => onReport(review.review_id)}
+          disabled={reportingId !== null}
+        >
+          {reportingId === review.review_id
+            ? "Reporting…"
+            : "⚑ Report"}
+        </button>
+      </div>
+    </div>
+
+    {error && (
+      <div className="alert alert-error">
+        {error}
+      </div>
+    )}
+
+  {/* Comments (FR-13) */}
+<div className="comment-thread">
+  {comments.map((c) => (
+    <div className="comment-row" key={c.comment_id}>
+      <Link
+        to={`/profile/${c.author_id}`}
+        className="comment-author"
+      >
+        <Avatar url={c.author_avatar} size={16} />
+        {c.author_name}
+      </Link>
+
+      <span className="comment-content">
+        {c.content}
+      </span>
+    </div>
+  ))}
+
+  {user ? (
+    <form
+      className="comment-form"
+      onSubmit={submitComment}
+    >
+      <input
+        type="text"
+        placeholder="แสดงความคิดเห็น / สอบถามผู้เขียนรีวิว…"
+        value={commentDraft}
+        onChange={(e) => setCommentDraft(e.target.value)}
+      />
+
+      <button
+        type="submit"
+        className="btn btn-ghost"
+        disabled={commentBusy}
+      >
+        {commentBusy ? "…" : "ส่ง"}
+      </button>
+    </form>
+  ) : (
+    <p className="muted small">
+      เข้าสู่ระบบเพื่อแสดงความคิดเห็น
+    </p>
+  )}
+</div>
+
+</div> {/* ปิด review-main */}
+
+
+{/* ฝั่งขวา */}
+{showRatings && (
+  <div
+    className="rating-modal-overlay"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) {
+        setShowRatings(false);
+      }
+    }}
+  >
+    <div
+      className="rating-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="รายละเอียดคะแนนรีวิว"
+    >
+      <div className="rating-modal-header">
+        <strong>คะแนนรายด้าน</strong>
+
+        <button
+          type="button"
+          className="rating-modal-close"
+          onClick={() => setShowRatings(false)}
+          aria-label="ปิด"
+        >
+          ×
+        </button>
+      </div>
+      
+      <RatingBreakdown ratings={reviewRatings} />
+      <div className="rating-row">
+        <span className="rating-label">
+          การแนะนำรายวิชา
+        </span>
+
+        <div className="rating-score">
+          <StarDisplay
+            value={Math.round(reviewRatings.recommendation)}
+          />
+
+          <strong>
+            {Number(reviewRatings.recommendation).toFixed(1)}
+          </strong>
         </div>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      <div className="rating-row">
+        <span className="rating-label">
+          ระดับความยาก
+        </span>
 
-      {/* Attached files (FR-9 / FR-10). Attaching happens only from the
-          write-review form or the edit form above — this is display/download
-          only, for the author and everyone else alike. */}
-      {files.length > 0 && (
-        <div className="review-files">
-          <ul className="file-list">
-            {files.map((f) => (
-              <li key={f.file_id}>
-                <a href={fileDownloadUrl(f.file_id)} className="file-link">
-                  📎 {f.filename}
-                </a>
-                <span className="muted small"> ({formatSize(f.size_bytes)})</span>
-              </li>
-            ))}
-          </ul>
+        <strong>
+          {Number(review.rating_difficulty).toFixed(1)} / 5
+        </strong>
+      </div>
+          </div>
         </div>
       )}
 
-      {/* Comments (FR-13) */}
-      <div className="comment-thread">
-        {comments.map((c) => (
-          <div className="comment-row" key={c.comment_id}>
-            <Link to={`/profile/${c.author_id}`} className="comment-author">
-              <Avatar url={c.author_avatar} size={16} />
-              {c.author_name}
-            </Link>
-            <span className="comment-content">{c.content}</span>
-          </div>
-        ))}
-        {user ? (
-          <form className="comment-form" onSubmit={submitComment}>
-            <input
-              type="text"
-              placeholder="แสดงความคิดเห็น / สอบถามผู้เขียนรีวิว…"
-              value={commentDraft}
-              onChange={(e) => setCommentDraft(e.target.value)}
-            />
-            <button type="submit" className="btn btn-ghost" disabled={commentBusy}>
-              {commentBusy ? "…" : "ส่ง"}
-            </button>
-          </form>
-        ) : (
-          <p className="muted small">เข้าสู่ระบบเพื่อแสดงความคิดเห็น</p>
-        )}
       </div>
-    </div>
-  );
+);
 }
+

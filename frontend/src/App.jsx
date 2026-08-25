@@ -7,6 +7,8 @@ import CourseDetail from "./CourseDetail.jsx";
 import Admin from "./Admin.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Profile from "./Profile.jsx";
+import CourseReviews from "./CourseReviews.jsx";
+
 
 /** Redirect to /login when nobody is signed in. */
 function RequireAuth({ children }) {
@@ -58,6 +60,10 @@ export default function App() {
               </RequireAuth>
             }
           />
+          <Route
+              path="/course/:id/reviews"
+              element={<CourseReviews />}
+            />
           <Route
             path="/dashboard"
             element={
