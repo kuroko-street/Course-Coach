@@ -1,14 +1,30 @@
 from db import dict_cursor
 
 
+DISPLAY_NAME_EXPR = "COALESCE(NULLIF(display_name, ''), username) AS display_name"
+
+
 class UserRepository:
     def list_all(self, conn):
         with dict_cursor(conn) as cur:
             cur.execute(
-                """
-                SELECT user_id, username, email, role, avatar_url,
-                       is_report_blocked, blocked_until
+                f"""
+                SELECT user_id, username, email, student_number, role, avatar_url,
+                       {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until
                 FROM users ORDER BY user_id;
+                """
+            )
+            return cur.fetchall()
+
+    def list_mock_users(self, conn):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                f"""
+                SELECT user_id, username, email, student_number, role, avatar_url,
+                       {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until
+                FROM users
+                WHERE is_mock = TRUE
+                ORDER BY user_id;
                 """
             )
             return cur.fetchall()
@@ -16,19 +32,109 @@ class UserRepository:
     def find_by_id(self, conn, user_id):
         with dict_cursor(conn) as cur:
             cur.execute(
-                """
-                SELECT user_id, username, email, role, avatar_url,
-                       is_report_blocked, blocked_until
+                f"""
+                SELECT user_id, username, email, student_number, role, avatar_url,
+                       {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until
                 FROM users WHERE user_id = %s;
                 """,
                 (user_id,),
             )
             return cur.fetchone()
 
+    def find_or_create_google_user(self, conn, google_sub, email, display_name, avatar_url):
+        """Link a verified Google identity without changing an existing role."""
+        fields = f"""user_id, username, email, student_number, role, avatar_url,
+                    {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until"""
+        with dict_cursor(conn) as cur:
+            cur.execute(f"SELECT {fields} FROM users WHERE google_sub = %s;", (google_sub,))
+            user = cur.fetchone()
+            if user is not None:
+                cur.execute(
+                    f"""
+                    UPDATE users SET email = %s, avatar_url = COALESCE(%s, avatar_url)
+                    WHERE user_id = %s RETURNING {fields};
+                    """,
+                    (email, avatar_url, user["user_id"]),
+                )
+                return cur.fetchone()
+
+            cur.execute("SELECT user_id FROM users WHERE LOWER(email) = LOWER(%s);", (email,))
+            existing = cur.fetchone()
+            if existing is not None:
+                cur.execute(
+                    f"""
+                    UPDATE users SET google_sub = %s, avatar_url = COALESCE(%s, avatar_url)
+                    WHERE user_id = %s RETURNING {fields};
+                    """,
+                    (google_sub, avatar_url, existing["user_id"]),
+                )
+                return cur.fetchone()
+
+            base_username = (display_name or email.split("@", 1)[0]).strip()[:90]
+            if not base_username:
+                base_username = "kmitl-user"
+            username = base_username
+            suffix = 1
+            while True:
+                cur.execute("SELECT 1 FROM users WHERE username = %s;", (username,))
+                if cur.fetchone() is None:
+                    break
+                suffix += 1
+                username = f"{base_username[:85]}-{suffix}"
+
+            cur.execute(
+                f"""
+                INSERT INTO users (username, email, role, avatar_url, google_sub)
+                VALUES (%s, %s, 'STUDENT', %s, %s) RETURNING {fields};
+                """,
+                (username, email, avatar_url, google_sub),
+            )
+            return cur.fetchone()
+
+    def find_mock_by_id(self, conn, user_id):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                f"""
+                SELECT user_id, username, email, student_number, role, avatar_url,
+                       {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until
+                FROM users
+                WHERE user_id = %s AND is_mock = TRUE;
+                """,
+                (user_id,),
+            )
+            return cur.fetchone()
+
+    def update_display_name(self, conn, user_id, display_name):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                f"""
+                UPDATE users SET display_name = %s WHERE user_id = %s
+                RETURNING user_id, username, email, student_number, role, avatar_url,
+                          {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until;
+                """,
+                (display_name, user_id),
+            )
+            return cur.fetchone()
+
+    def update_avatar_url(self, conn, user_id, avatar_url):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                f"""
+                UPDATE users SET avatar_url = %s WHERE user_id = %s
+                RETURNING user_id, username, email, student_number, role, avatar_url,
+                          {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until;
+                """,
+                (avatar_url, user_id),
+            )
+            return cur.fetchone()
+
     def get_profile(self, conn, user_id):
         with dict_cursor(conn) as cur:
             cur.execute(
-                "SELECT user_id, username, avatar_url, role FROM users WHERE user_id = %s;",
+                f"""
+                SELECT user_id, username, student_number, avatar_url, role, {DISPLAY_NAME_EXPR}
+                FROM users WHERE user_id = %s;
+                """,
                 (user_id,),
             )
             user = cur.fetchone()
@@ -38,7 +144,7 @@ class UserRepository:
                 """
                 SELECT r.review_id, r.course_id, r.reviewer_id, r.content,
                        r.academic_year, r.semester, r.section,
-                       r.rating_satisfaction, r.rating_difficulty, r.rating_workload,
+                       r.rating_satisfaction, r.rating_recommendation, r.rating_workload,
                        r.rating_content, r.rating_teaching, r.rating_exam,
                        r.report_count, r.status, r.created_at, r.edited_at,
                        c.course_code, c.course_name,
@@ -53,19 +159,6 @@ class UserRepository:
             reviews = cur.fetchall()
             cur.execute(
                 """
-                SELECT ROUND(AVG(rating_satisfaction)::numeric, 2) AS avg_satisfaction,
-                       ROUND(AVG(rating_difficulty)::numeric, 2) AS avg_difficulty,
-                       ROUND(AVG(rating_workload)::numeric, 2) AS avg_workload,
-                       ROUND(AVG(rating_content)::numeric, 2) AS avg_content,
-                       ROUND(AVG(rating_teaching)::numeric, 2) AS avg_teaching,
-                       ROUND(AVG(rating_exam)::numeric, 2) AS avg_exam
-                FROM reviews WHERE reviewer_id = %s AND status = 'ACTIVE';
-                """,
-                (user_id,),
-            )
-            averages = cur.fetchone()
-            cur.execute(
-                """
                 SELECT COUNT(*) AS total_likes FROM review_likes rl
                 JOIN reviews r ON r.review_id = rl.review_id
                 WHERE r.reviewer_id = %s AND r.status = 'ACTIVE';
@@ -73,7 +166,7 @@ class UserRepository:
                 (user_id,),
             )
             total_likes = cur.fetchone()["total_likes"]
-        return user, reviews, averages, total_likes
+        return user, reviews, total_likes
 
     def list_enrollments(self, conn, user_id):
         with dict_cursor(conn) as cur:

@@ -5,14 +5,17 @@ live in ``services``, and SQL lives in ``repositories``.  This module only
 assembles the application and exposes the health check.
 """
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from api.admin_routes import router as admin_router
 from api.course_routes import router as course_router
-from api.file_routes import router as file_router
+from api.plan_routes import router as plan_router
 from api.review_routes import router as review_router
+from api.summary_file_routes import router as summary_file_router
 from api.user_routes import router as user_router
 from db import get_connection
 
@@ -23,8 +26,23 @@ logger = logging.getLogger("coursecoach")
 app = FastAPI(title="Course Coach API", version="5.0.0")
 
 app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "coursecoach-local-dev-change-me"),
+    session_cookie="coursecoach_session",
+    max_age=60 * 60 * 12,
+    same_site="lax",
+    https_only=os.getenv("COOKIE_SECURE", "false").casefold() == "true",
+)
+
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS", "http://localhost,http://localhost:3000"
+        ).split(",")
+        if origin.strip()
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,8 +51,9 @@ app.add_middleware(
 app.include_router(user_router)
 app.include_router(course_router)
 app.include_router(review_router)
-app.include_router(file_router)
 app.include_router(admin_router)
+app.include_router(plan_router)
+app.include_router(summary_file_router)
 
 
 @app.get("/health")

@@ -9,6 +9,7 @@ __pycache__/
 
 # Env
 .env
+docker-compose.override.yml
 
 # Docs
 docs/

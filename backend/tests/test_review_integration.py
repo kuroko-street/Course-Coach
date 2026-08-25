@@ -65,6 +65,15 @@ def test_delete_is_soft_delete(client, db_conn, created_review):
     with db_conn.cursor() as cur:
         cur.execute("SELECT status FROM reviews WHERE review_id = %s", (created_review,))
         assert cur.fetchone()[0] == "DELETED"
+    enrollments = client.get(
+        "/api/courses/2/enrollments/me", headers={"X-User-Id": "1"}
+    )
+    assert enrollments.status_code == 200
+    deleted_term = next(
+        row for row in enrollments.json()["enrollments"]
+        if row["academic_year"] == 2567 and row["semester"] == "2"
+    )
+    assert deleted_term["reviewed"] is False
 
 
 def test_report_uses_authenticated_identity(client, db_conn, created_review):
@@ -80,3 +89,16 @@ def test_report_uses_authenticated_identity(client, db_conn, created_review):
             "SELECT reporter_id FROM review_reports WHERE report_id = %s", (report_id,)
         )
         assert cur.fetchone()[0] == 2
+
+
+def test_user_can_report_a_review_only_once(client, created_review):
+    first = client.post(
+        f"/api/reviews/{created_review}/report", headers={"X-User-Id": "2"}
+    )
+    assert first.status_code == 201, first.text
+
+    duplicate = client.post(
+        f"/api/reviews/{created_review}/report", headers={"X-User-Id": "2"}
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "You have already reported this review."

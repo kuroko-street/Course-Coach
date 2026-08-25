@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.dependencies import optional_user_id, require_user
 from domain.errors import ServiceError
@@ -38,6 +38,11 @@ def get_course(course_id: int):
     return invoke(service.detail, course_id)
 
 
+@router.get("/instructors/{instructor_id}/profile")
+def get_instructor_profile(instructor_id: int):
+    return invoke(service.instructor_profile, instructor_id)
+
+
 @router.get("/courses/{course_id}/reviews")
 def list_course_reviews(
     course_id: int,
@@ -52,5 +57,14 @@ def my_course_enrollments(course_id: int, user: dict = Depends(require_user)):
 
 
 @router.get("/dashboard/rankings")
-def dashboard_rankings():
-    return invoke(service.rankings)
+def dashboard_rankings(
+    metric: str = "reviews",
+    department: str | None = None,
+    min_reviews: int = Query(default=0, ge=0),
+):
+    return invoke(service.rankings, metric, department, min_reviews)
+
+
+@router.get("/dashboard/summary")
+def dashboard_summary():
+    return invoke(service.dashboard_summary)

@@ -2,6 +2,18 @@ from db import dict_cursor
 
 
 class ModerationRepository:
+    def summary(self, conn):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'HIDDEN') AS pending_count,
+                    (SELECT COUNT(*) FROM audit_logs WHERE action = 'MODERATE_REVIEW') AS reviewed_count
+                FROM reviews;
+                """
+            )
+            return cur.fetchone()
+
     def list_hidden(self, conn):
         with dict_cursor(conn) as cur:
             cur.execute(
@@ -9,7 +21,7 @@ class ModerationRepository:
                 SELECT r.review_id, r.content, r.academic_year, r.semester, r.section,
                        r.report_count, r.status, r.created_at, c.course_id,
                        c.course_code, c.course_name, c.department,
-                       u.username AS reviewer_name,
+                       COALESCE(NULLIF(u.display_name, ''), u.username) AS reviewer_name,
                        (SELECT MAX(reported_at) FROM review_reports rr
                         WHERE rr.review_id = r.review_id) AS last_reported_at
                 FROM reviews r

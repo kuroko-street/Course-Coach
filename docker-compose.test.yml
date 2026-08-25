@@ -6,7 +6,27 @@ services:
       POSTGRES_PASSWORD: coursecoach_pass
       POSTGRES_DB: coursecoach_test
     volumes:
+      # Postgres runs every /docker-entrypoint-initdb.d/*.sql once, in
+      # glob-sorted order, on a fresh data dir. init.sql never carries a
+      # feature's schema/seed directly (GIT_WORKFLOW.md #7) — that lives in
+      # db/migrations/*.sql instead — so those are mounted here too, renamed
+      # to sort after init.sql. NOTE: bash's glob sort here is locale-aware
+      # and treats "." as a weak separator, so a numeric-prefixed name like
+      # "002_...sql" actually sorts *before* "init.sql" (digit '0' outranks
+      # letter 's' once the '.' is skipped) — confirmed by running
+      # `for f in /docker-entrypoint-initdb.d/*; do echo "$f"; done` in the
+      # postgres:16 image. Prefixing with a letter that's alphabetically
+      # after "init" ("migrate_...") sorts correctly regardless of that
+      # locale quirk. A separate one-shot `migrate` service isn't used here
+      # (unlike docker-compose.yml) because it would exit as soon as it
+      # finishes, which trips `--abort-on-container-exit` before `tests`
+      # ever runs.
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./db/migrations/002_upgrade_sprint2.sql:/docker-entrypoint-initdb.d/migrate_002_upgrade_sprint2.sql:ro
+      - ./db/migrations/003_study_plans.sql:/docker-entrypoint-initdb.d/migrate_003_study_plans.sql:ro
+      - ./db/migrations/008_user_display_name.sql:/docker-entrypoint-initdb.d/migrate_008_user_display_name.sql:ro
+      - ./db/migrations/009_summary_files.sql:/docker-entrypoint-initdb.d/migrate_009_summary_files.sql:ro
+      - ./db/migrations/010_review_rating_criteria.sql:/docker-entrypoint-initdb.d/migrate_010_review_rating_criteria.sql:ro
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
@@ -26,6 +46,9 @@ services:
       DB_USER: coursecoach
       DB_PASSWORD: coursecoach_pass
       UPLOADS_DIR: /tmp/coursecoach-test-uploads
+      AVATARS_DIR: /tmp/coursecoach-test-avatars
+      ALLOW_MOCK_AUTH: "true"
+      SESSION_SECRET: coursecoach-test-session-secret
     depends_on:
       test_db:
         condition: service_healthy

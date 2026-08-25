@@ -4,7 +4,7 @@ from db import dict_cursor
 REVIEW_FIELDS = """
     r.review_id, r.course_id, r.reviewer_id, r.content,
     r.academic_year, r.semester, r.section,
-    r.rating_satisfaction, r.rating_difficulty, r.rating_workload,
+    r.rating_satisfaction, r.rating_recommendation, r.rating_workload,
     r.rating_content, r.rating_teaching, r.rating_exam,
     r.report_count, r.status, r.created_at, r.edited_at
 """
@@ -38,7 +38,7 @@ class ReviewRepository:
                 """
                 INSERT INTO reviews
                     (course_id, reviewer_id, content, academic_year, semester, section,
-                     rating_satisfaction, rating_difficulty, rating_workload,
+                     rating_satisfaction, rating_recommendation, rating_workload,
                      rating_content, rating_teaching, rating_exam)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING review_id;
@@ -46,7 +46,7 @@ class ReviewRepository:
                 (
                     data.course_id, reviewer_id, data.content, data.academic_year,
                     data.semester, data.section, data.rating_satisfaction,
-                    data.rating_difficulty, data.rating_workload, data.rating_content,
+                    data.rating_recommendation, data.rating_workload, data.rating_content,
                     data.rating_teaching, data.rating_exam,
                 ),
             )
@@ -58,14 +58,14 @@ class ReviewRepository:
                 """
                 UPDATE reviews
                 SET content = %s, academic_year = %s, semester = %s, section = %s,
-                    rating_satisfaction = %s, rating_difficulty = %s,
+                    rating_satisfaction = %s, rating_recommendation = %s,
                     rating_workload = %s, rating_content = %s,
                     rating_teaching = %s, rating_exam = %s, edited_at = NOW()
                 WHERE review_id = %s;
                 """,
                 (
                     data.content, data.academic_year, data.semester, data.section,
-                    data.rating_satisfaction, data.rating_difficulty,
+                    data.rating_satisfaction, data.rating_recommendation,
                     data.rating_workload, data.rating_content, data.rating_teaching,
                     data.rating_exam, review_id,
                 ),
@@ -108,7 +108,8 @@ class ReviewRepository:
             cur.execute(
                 """
                 SELECT rc.comment_id, rc.review_id, rc.content, rc.created_at,
-                       u.user_id AS author_id, u.username AS author_name,
+                       u.user_id AS author_id,
+                       COALESCE(NULLIF(u.display_name, ''), u.username) AS author_name,
                        u.avatar_url AS author_avatar
                 FROM review_comments rc
                 JOIN users u ON u.user_id = rc.user_id
@@ -136,11 +137,14 @@ class ReviewRepository:
             cur.execute(
                 """
                 INSERT INTO review_reports (review_id, reporter_id)
-                VALUES (%s, %s) RETURNING report_id;
+                VALUES (%s, %s)
+                ON CONFLICT (review_id, reporter_id) DO NOTHING
+                RETURNING report_id;
                 """,
                 (review_id, reporter_id),
             )
-            return cur.fetchone()["report_id"]
+            report = cur.fetchone()
+            return report["report_id"] if report else None
 
     def increment_report_count(self, conn, review_id, threshold):
         with dict_cursor(conn) as cur:

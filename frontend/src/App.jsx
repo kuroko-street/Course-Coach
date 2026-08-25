@@ -7,26 +7,33 @@ import CourseDetail from "./CourseDetail.jsx";
 import Admin from "./Admin.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Profile from "./Profile.jsx";
+import Instructor from "./Instructor.jsx";
+import Plans from "./Plans.jsx";
+import PlanDetail from "./PlanDetail.jsx";
+import CourseReviewsPage from "./CourseReviewsPage.jsx";
+import CourseSummaryFilesPage from "./CourseSummaryFilesPage.jsx";
 
 /** Redirect to /login when nobody is signed in. */
 function RequireAuth({ children }) {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const location = useLocation();
+  if (!authReady) return <p className="muted">กำลังตรวจสอบการเข้าสู่ระบบ…</p>;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   return children;
 }
 
 /** As above, and additionally requires the ADMIN role. */
 function RequireAdmin({ children }) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, authReady } = useAuth();
   const location = useLocation();
+  if (!authReady) return <p className="muted">กำลังตรวจสอบการเข้าสู่ระบบ…</p>;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   if (!isAdmin) {
     return (
       <section>
         <div className="alert alert-error">
           หน้านี้สำหรับผู้ดูแลระบบเท่านั้น — you are signed in as{" "}
-          <strong>{user.username}</strong> ({user.role}). Switch to an ADMIN
+          <strong>{user.display_name}</strong> ({user.role}). Switch to an ADMIN
           account to open the moderation queue.
         </div>
       </section>
@@ -59,6 +66,22 @@ export default function App() {
             }
           />
           <Route
+            path="/course/:id/reviews"
+            element={
+              <RequireAuth>
+                <CourseReviewsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/course/:id/summary-files"
+            element={
+              <RequireAuth>
+                <CourseSummaryFilesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/dashboard"
             element={
               <RequireAuth>
@@ -71,6 +94,30 @@ export default function App() {
             element={
               <RequireAuth>
                 <Profile />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/instructor/:id"
+            element={
+              <RequireAuth>
+                <Instructor />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/plans"
+            element={
+              <RequireAuth>
+                <Plans />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/plans/:id"
+            element={
+              <RequireAuth>
+                <PlanDetail />
               </RequireAuth>
             }
           />

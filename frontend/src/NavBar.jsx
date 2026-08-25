@@ -10,9 +10,9 @@ export default function NavBar() {
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
-  function handleLogout() {
-    logout();
-    navigate("/login");
+  async function handleLogout() {
+    await logout();
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -29,6 +29,9 @@ export default function NavBar() {
           <NavLink to="/dashboard" className="nav-link">
             Dashboard
           </NavLink>
+          <NavLink to="/plans" className="nav-link">
+            แผนการเรียน
+          </NavLink>
           {isAdmin && (
             <NavLink to="/admin" className="nav-link">
               Admin Queue
@@ -40,16 +43,13 @@ export default function NavBar() {
           {user ? (
             <>
               <Link to={`/profile/${user.user_id}`} className="nav-username">
-                {user.username}
+                {user.display_name}
                 <span className={`role-pill role-${user.role.toLowerCase()}`}>
                   {user.role}
                 </span>
               </Link>
-              <Link to="/login" className="btn btn-ghost">
-                Switch user
-              </Link>
               <button type="button" className="btn btn-ghost" onClick={handleLogout}>
-                Log out
+                ออกจากระบบ
               </button>
             </>
           ) : (

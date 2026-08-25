@@ -31,14 +31,23 @@ services:
       DB_NAME: coursecoach
       DB_USER: coursecoach
       DB_PASSWORD: coursecoach_pass
+      # OAuth client IDs are public browser identifiers, not secrets. This
+      # shared localhost client lets every teammate use KMITL Google Login.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-610984601873-obcs09oonbadi58tvgkhr1sbr4muiv92.apps.googleusercontent.com}
+      GOOGLE_ALLOWED_DOMAIN: kmitl.ac.th
+      SESSION_SECRET: ${SESSION_SECRET:-coursecoach-local-dev-change-me}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+      ALLOW_MOCK_AUTH: ${ALLOW_MOCK_AUTH:-false}
     ports:
       # Same reasoning as db: the browser never talks to the backend
       # directly, only the frontend's Vite proxy does (over the internal
       # Docker network). Kept on localhost for your own debugging/curl.
       - "127.0.0.1:5000:5000"
     volumes:
-      # Review attachments (FR-9/FR-10) persisted outside the container.
+      # Course-level summary files and profile media persist outside the container.
       - uploads_data:/app/uploads
+      - avatars_data:/app/avatars
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -54,7 +63,7 @@ services:
     command:
       - sh
       - -c
-      - psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f /migrations/002_upgrade_sprint2.sql
+      - until pg_isready -h db -U coursecoach -d coursecoach; do sleep 1; done; sleep 2; for migration in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f "$$migration" || exit 1; done
     depends_on:
       db:
         condition: service_healthy
@@ -74,3 +83,4 @@ services:
 volumes:
   db_data:
   uploads_data:
+  avatars_data:
