@@ -6,7 +6,8 @@ import { StarDisplay } from "./RatingStars.jsx";
 /**
  * / — Course Catalog.
  *
- * Lists every course as a card. Search (code, name, or tag — FR-1) and the
+ * Lists every course as a card. Full-text search (code, course name, tag,
+ * department, or instructor name — FR-1) and the
  * department filter (FR-2) are both applied server-side by
  * GET /api/courses?search=&department=. A tag clicked from a course card or
  * the course detail page arrives here via ?search=<tag>.
@@ -73,7 +74,7 @@ export default function Home() {
         <input
           className="search-bar"
           type="search"
-          placeholder="ค้นหาด้วยรหัสวิชา, ชื่อวิชา, หรือแท็ก…"
+          placeholder="ค้นหารหัสวิชา ชื่อวิชา แท็ก หรือชื่ออาจารย์…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -127,6 +128,9 @@ export default function Home() {
               <span className="badge">{c.course_code}</span>
               <strong>{c.course_name}</strong>
               <div className="meta">{c.department}</div>
+              {c.instructors?.length > 0 && (
+                <div className="meta">อาจารย์: {c.instructors.join(", ")}</div>
+              )}
               {c.avg_rating != null && (
                 <div className="meta course-rating">
                   <StarDisplay value={Math.round(Number(c.avg_rating))} />

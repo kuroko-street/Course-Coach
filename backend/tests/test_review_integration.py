@@ -80,3 +80,16 @@ def test_report_uses_authenticated_identity(client, db_conn, created_review):
             "SELECT reporter_id FROM review_reports WHERE report_id = %s", (report_id,)
         )
         assert cur.fetchone()[0] == 2
+
+
+def test_user_can_report_a_review_only_once(client, created_review):
+    first = client.post(
+        f"/api/reviews/{created_review}/report", headers={"X-User-Id": "2"}
+    )
+    assert first.status_code == 201, first.text
+
+    duplicate = client.post(
+        f"/api/reviews/{created_review}/report", headers={"X-User-Id": "2"}
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "You have already reported this review."

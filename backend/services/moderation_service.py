@@ -17,6 +17,13 @@ class ModerationService:
         finally:
             conn.close()
 
+    def report_summary(self):
+        conn = self.connection_factory()
+        try:
+            return self.moderation.summary(conn)
+        finally:
+            conn.close()
+
     def apply_action(self, review_id, action, admin, ip_address=None):
         conn = self.connection_factory()
         try:

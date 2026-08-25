@@ -1,4 +1,6 @@
-from fastapi import Depends, Header, HTTPException
+import os
+
+from fastapi import Depends, Header, HTTPException, Request
 
 from db import get_connection
 from repositories.user_repository import UserRepository
@@ -7,16 +9,29 @@ from repositories.user_repository import UserRepository
 user_repository = UserRepository()
 
 
-def require_user(x_user_id: int | None = Header(default=None, alias="X-User-Id")):
-    if x_user_id is None:
-        raise HTTPException(status_code=401, detail="Missing X-User-Id header.")
+def _session_user_id(request: Request, x_user_id: int | None):
+    user_id = request.session.get("user_id")
+    allow_mock = os.getenv("ALLOW_MOCK_AUTH", "false").casefold() == "true"
+    if user_id is None and allow_mock:
+        user_id = x_user_id
+    return user_id
+
+
+def require_user(
+    request: Request,
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+):
+    user_id = _session_user_id(request, x_user_id)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
     conn = get_connection()
     try:
-        user = user_repository.find_by_id(conn, x_user_id)
+        user = user_repository.find_by_id(conn, user_id)
     finally:
         conn.close()
     if user is None:
-        raise HTTPException(status_code=401, detail=f"Unknown user id {x_user_id}.")
+        request.session.clear()
+        raise HTTPException(status_code=401, detail="Authenticated user no longer exists.")
     return user
 
 
@@ -26,5 +41,8 @@ def require_admin(user: dict = Depends(require_user)):
     return user
 
 
-def optional_user_id(x_user_id: int | None = Header(default=None, alias="X-User-Id")):
-    return x_user_id
+def optional_user_id(
+    request: Request,
+    x_user_id: int | None = Header(default=None, alias="X-User-Id"),
+):
+    return _session_user_id(request, x_user_id)
