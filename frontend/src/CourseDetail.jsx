@@ -175,7 +175,9 @@ export default function CourseDetail() {
       setSuccess(`ส่งรีวิวเรียบร้อย (review #${data.review_id})`);
       setForm({ content: "", ratings: defaultRatings() });
       setReviewModalOpen(false);
-      await Promise.all([loadReviews(), loadEnrollments()]);
+      await Promise.all([loadCourse(), loadReviews(), loadEnrollments()]).catch(
+        (refreshError) => setError(`ส่งรีวิวสำเร็จ แต่โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${refreshError.message}`)
+      );
     } catch (err) {
       setError(`Submission failed: ${err.message}`);
     } finally {
@@ -198,7 +200,9 @@ export default function CourseDetail() {
           : `รายงานรีวิว #${reviewId} แล้ว (${data.report_count}/5)`
       );
       // A review that just crossed the threshold disappears from this list.
-      await loadReviews();
+      await Promise.all([loadCourse(), loadReviews()]).catch(
+        (refreshError) => setError(`รายงานสำเร็จ แต่โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${refreshError.message}`)
+      );
     } catch (err) {
       setError(`Report failed: ${err.message}`);
     } finally {
@@ -206,17 +210,26 @@ export default function CourseDetail() {
     }
   }
 
-  function handleReviewDeleted(reviewId) {
+  async function handleReviewDeleted(reviewId) {
     setReviews((prev) => prev.filter((r) => r.review_id !== reviewId));
     setSuccess(`ลบรีวิว #${reviewId} แล้ว`);
-    loadEnrollments();
+    try {
+      await Promise.all([loadCourse(), loadEnrollments()]);
+    } catch (err) {
+      setError(`โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${err.message}`);
+    }
   }
 
-  function handleReviewUpdated(reviewId, patch) {
+  async function handleReviewUpdated(reviewId, patch) {
     setReviews((prev) =>
       prev.map((r) => (r.review_id === reviewId ? { ...r, ...patch } : r))
     );
     setSuccess(`แก้ไขรีวิว #${reviewId} แล้ว`);
+    try {
+      await loadCourse();
+    } catch (err) {
+      setError(`โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${err.message}`);
+    }
   }
 
   function selectSummaryFiles(event) {
