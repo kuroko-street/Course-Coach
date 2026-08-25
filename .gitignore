@@ -13,3 +13,4 @@ docker-compose.override.yml
 
 # Docs
 docs/
+GIT_WORKFLOW.md
