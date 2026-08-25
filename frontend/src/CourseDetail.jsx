@@ -442,20 +442,32 @@ export default function CourseDetail() {
       <section>
         <h2>มีส่วนร่วมกับวิชานี้</h2>
         <div className="contribution-grid">
-          <div className="contribution-card contribution-review">
-            <div>
-              <strong>📝 เขียนรีวิววิชานี้</strong>
-              <p>แชร์ประสบการณ์และให้คะแนน</p>
+          {reviewableEnrollments.length ? (
+            <div className="contribution-card contribution-review">
+              <div>
+                <strong>📝 เขียนรีวิววิชานี้</strong>
+                <p>แชร์ประสบการณ์และให้คะแนน</p>
+              </div>
+              <button
+                type="button"
+                className="btn contribution-review-button"
+                onClick={() => setReviewModalOpen(true)}
+              >
+                + รีวิว
+              </button>
             </div>
-            <button
-              type="button"
-              className="btn contribution-review-button"
-              disabled={!reviewableEnrollments.length}
-              onClick={() => setReviewModalOpen(true)}
-            >
-              + รีวิว
-            </button>
-          </div>
+          ) : (
+            <div className="contribution-card contribution-unavailable" role="status">
+              <strong>
+                {enrollments.length ? "คุณใช้สิทธิรีวิววิชานี้แล้ว" : "สิทธิรีวิวเฉพาะผู้เคยเรียน"}
+              </strong>
+              <p>
+                {enrollments.length
+                  ? "ลบรีวิวเดิมก่อน หากต้องการเขียนรีวิวใหม่"
+                  : "ไม่พบประวัติการลงทะเบียนเรียนวิชานี้ของคุณ"}
+              </p>
+            </div>
+          )}
           <div className="contribution-card contribution-file">
             <div>
               <strong>📤 อัปโหลดไฟล์สรุป</strong>
@@ -472,10 +484,7 @@ export default function CourseDetail() {
           </div>
         </div>
         {!enrollments.length && (
-          <p className="muted small">ต้องมีประวัติว่าเคยเรียนวิชานี้ก่อนจึงจะรีวิวหรืออัปโหลดได้</p>
-        )}
-        {enrollments.length > 0 && !reviewableEnrollments.length && (
-          <p className="muted small">คุณรีวิวทุกภาคการศึกษาที่เคยเรียนแล้ว ลบรีวิวเดิมก่อนหากต้องการเขียนใหม่</p>
+          <p className="muted small">ต้องมีประวัติว่าเคยเรียนวิชานี้ก่อนจึงจะอัปโหลดไฟล์ได้</p>
         )}
       </section>
 

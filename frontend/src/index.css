@@ -1471,6 +1471,17 @@ a.tag-chip:hover,
 .contribution-card p { margin: 6px 0 0; color: var(--muted); }
 .contribution-review { border-color: #e65b5b; background: #fffafa; }
 .contribution-review strong { color: #d94b4b; }
+.contribution-unavailable {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  background: #fff;
+  text-align: center;
+}
+.contribution-unavailable strong { color: #262626; font-size: 15px; }
+.contribution-unavailable p { margin: 0; font-size: 12px; }
 .contribution-file { border-color: #1478d4; background: #f7fbff; }
 .contribution-file strong { color: #0568c8; }
 .contribution-review-button { background: #dc5151; border-color: #dc5151; white-space: nowrap; }
