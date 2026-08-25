@@ -453,6 +453,49 @@ textarea {
 }
 
 /* ---- Admin queue ---- */
+.moderation-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.summary-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fff;
+  display: grid;
+  gap: 3px;
+}
+
+.summary-card span, .summary-card small { color: var(--muted); }
+.summary-card strong { font-size: 28px; line-height: 1; }
+.summary-pending { border-left: 4px solid #e05d55; }
+.summary-pending strong { color: var(--danger); }
+.summary-reviewed { border-left: 4px solid var(--success); }
+.summary-reviewed strong { color: var(--success); }
+
+.review-queue { margin-top: 8px; }
+.queue-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #252525;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.queue-toggle:hover { background: #fafafa; }
+.queue-count { color: var(--brand); font-size: 13px; margin-left: 6px; }
+.queue-chevron { color: var(--muted); font-size: 20px; line-height: 1; }
+.review-queue .admin-list { margin-top: 10px; }
+
 .admin-card-head {
   display: flex;
   align-items: center;
@@ -496,6 +539,81 @@ textarea {
   gap: 8px;
   margin-top: 14px;
 }
+
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  flex-wrap: wrap;
+}
+
+.admin-tab {
+  color: #444;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.admin-tab.active {
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.course-admin-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.status-inactive,
+.curriculum-chip {
+  display: inline-block;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  margin: 8px 6px 0 0;
+}
+
+.status-inactive { background: #fdecea; color: var(--danger); }
+.curriculum-chip { background: var(--brand-soft); color: var(--brand); }
+
+.instructor-picker { position: relative; margin-bottom: 10px; }
+.instructor-input-wrap {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+.instructor-input-wrap:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+.instructor-input-wrap input { flex: 1; min-width: 180px; border: 0; outline: 0; padding: 5px 2px; }
+.instructor-chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 8px; background: var(--brand-soft); color: var(--brand); font-size: 13px; }
+.instructor-chip button { border: 0; background: transparent; color: inherit; padding: 0 1px; line-height: 1; cursor: pointer; }
+.instructor-options { position: absolute; z-index: 3; left: 0; right: 0; top: 70px; display: grid; gap: 2px; padding: 5px; border: 1px solid var(--border); border-radius: 7px; background: #fff; box-shadow: 0 8px 20px rgba(0,0,0,.1); }
+.instructor-options button { text-align: left; border: 0; border-radius: 5px; background: transparent; color: #333; padding: 8px 10px; }
+.instructor-options button:hover { background: var(--brand-soft); color: var(--brand); }
+.instructor-no-result { padding: 8px 10px; color: var(--muted); font-size: 13px; }
+.instructor-add-toggle { margin-top: 7px; font-size: 13px; padding: 5px 9px; }
+.instructor-add-form { display: flex; gap: 8px; margin-top: 8px; }
+.instructor-add-form input { flex: 1; }
+.instructor-add-form button { white-space: nowrap; }
+.instructor-picker > small { display: block; margin-top: 6px; }
+
+.import-form { margin-top: 14px; }
+.import-table-wrap { overflow-x: auto; }
+.import-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.import-table th, .import-table td { border-bottom: 1px solid var(--border); padding: 9px 8px; text-align: left; vertical-align: top; }
+.import-table th { color: var(--muted); white-space: nowrap; }
+.import-error { color: var(--danger); font-weight: 600; }
+.import-ok { color: var(--success); font-weight: 600; }
+.import-skip { color: #546e7a; font-weight: 600; }
+.import-update { color: #b26a00; font-weight: 600; }
 
 .empty-state {
   text-align: center;

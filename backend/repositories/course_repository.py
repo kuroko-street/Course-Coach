@@ -14,7 +14,7 @@ class CourseRepository:
             return cur.fetchall()
 
     def search(self, conn, search=None, department=None):
-        clauses, params = [], []
+        clauses, params = ["c.is_active = TRUE"], []
         if search and search.strip():
             pattern = f"%{search.strip()}%"
             clauses.append("(c.course_code ILIKE %s OR c.course_name ILIKE %s OR t.tag_name ILIKE %s)")
