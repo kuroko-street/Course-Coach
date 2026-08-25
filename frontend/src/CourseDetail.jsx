@@ -468,24 +468,27 @@ export default function CourseDetail() {
               </p>
             </div>
           )}
-          <div className="contribution-card contribution-file">
-            <div>
-              <strong>📤 อัปโหลดไฟล์สรุป</strong>
-              <p>แบ่งปันชีทสรุปหรือไฟล์เรียน</p>
+          {enrollments.length ? (
+            <div className="contribution-card contribution-file">
+              <div>
+                <strong>📤 อัปโหลดไฟล์สรุป</strong>
+                <p>แบ่งปันชีทสรุปหรือไฟล์เรียน</p>
+              </div>
+              <button
+                type="button"
+                className="btn contribution-file-button"
+                onClick={() => setUploadModalOpen(true)}
+              >
+                + อัปโหลด
+              </button>
             </div>
-            <button
-              type="button"
-              className="btn contribution-file-button"
-              disabled={!enrollments.length}
-              onClick={() => setUploadModalOpen(true)}
-            >
-              + อัปโหลด
-            </button>
-          </div>
+          ) : (
+            <div className="contribution-card contribution-unavailable" role="status">
+              <strong>สิทธิอัปโหลดเฉพาะผู้เคยเรียน</strong>
+              <p>ไม่พบประวัติการลงทะเบียนเรียนวิชานี้ของคุณ</p>
+            </div>
+          )}
         </div>
-        {!enrollments.length && (
-          <p className="muted small">ต้องมีประวัติว่าเคยเรียนวิชานี้ก่อนจึงจะอัปโหลดไฟล์ได้</p>
-        )}
       </section>
 
       <section>
