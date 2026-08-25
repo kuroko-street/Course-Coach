@@ -1,7 +1,11 @@
 import os
+import logging
 
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
+
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleIdentityError(Exception):
@@ -27,6 +31,13 @@ class GoogleIdentityVerifier:
                 credential, google_requests.Request(), self.client_id
             )
         except Exception as exc:
+            # Never log the credential itself. The exception type/message is
+            # enough to diagnose clock, audience and certificate failures.
+            logger.warning(
+                "Google ID token verification failed (%s): %s",
+                type(exc).__name__,
+                exc,
+            )
             raise GoogleIdentityError("Google could not verify this sign-in.") from exc
 
         if claims.get("hd", "").casefold() != self.allowed_domain:

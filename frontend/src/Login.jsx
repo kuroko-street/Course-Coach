@@ -5,6 +5,8 @@ import { useAuth } from "./AuthContext.jsx";
 import Avatar from "./Avatar.jsx";
 
 const GOOGLE_SCRIPT_ID = "google-identity-services";
+let initializedGoogleClientId = null;
+let activeCredentialHandler = null;
 
 function loadGoogleIdentityScript() {
   return new Promise((resolve, reject) => {
@@ -57,6 +59,13 @@ export default function Login() {
   );
 
   useEffect(() => {
+    activeCredentialHandler = handleCredential;
+    return () => {
+      if (activeCredentialHandler === handleCredential) activeCredentialHandler = null;
+    };
+  }, [handleCredential]);
+
+  useEffect(() => {
     api("/auth/config")
       .then(async (nextConfig) => {
         setConfig(nextConfig);
@@ -90,11 +99,14 @@ export default function Login() {
     loadGoogleIdentityScript()
       .then(() => {
         if (cancelled) return;
-        window.google.accounts.id.initialize({
-          client_id: config.google_client_id,
-          callback: handleCredential,
-          hd: config.allowed_domain,
-        });
+        if (initializedGoogleClientId !== config.google_client_id) {
+          window.google.accounts.id.initialize({
+            client_id: config.google_client_id,
+            callback: (response) => activeCredentialHandler?.(response),
+            hd: config.allowed_domain,
+          });
+          initializedGoogleClientId = config.google_client_id;
+        }
         buttonRef.current.replaceChildren();
         window.google.accounts.id.renderButton(buttonRef.current, {
           type: "standard",
