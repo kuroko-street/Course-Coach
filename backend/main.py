@@ -13,9 +13,9 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from api.admin_routes import router as admin_router
 from api.course_routes import router as course_router
-from api.file_routes import router as file_router
 from api.plan_routes import router as plan_router
 from api.review_routes import router as review_router
+from api.summary_file_routes import router as summary_file_router
 from api.user_routes import router as user_router
 from db import get_connection
 
@@ -51,9 +51,9 @@ app.add_middleware(
 app.include_router(user_router)
 app.include_router(course_router)
 app.include_router(review_router)
-app.include_router(file_router)
 app.include_router(admin_router)
 app.include_router(plan_router)
+app.include_router(summary_file_router)
 
 
 @app.get("/health")

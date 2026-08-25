@@ -144,7 +144,7 @@ class UserRepository:
                 """
                 SELECT r.review_id, r.course_id, r.reviewer_id, r.content,
                        r.academic_year, r.semester, r.section,
-                       r.rating_satisfaction, r.rating_difficulty, r.rating_workload,
+                       r.rating_satisfaction, r.rating_recommendation, r.rating_workload,
                        r.rating_content, r.rating_teaching, r.rating_exam,
                        r.report_count, r.status, r.created_at, r.edited_at,
                        c.course_code, c.course_name,

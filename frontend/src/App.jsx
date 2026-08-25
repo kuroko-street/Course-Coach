@@ -10,6 +10,8 @@ import Profile from "./Profile.jsx";
 import Instructor from "./Instructor.jsx";
 import Plans from "./Plans.jsx";
 import PlanDetail from "./PlanDetail.jsx";
+import CourseReviewsPage from "./CourseReviewsPage.jsx";
+import CourseSummaryFilesPage from "./CourseSummaryFilesPage.jsx";
 
 /** Redirect to /login when nobody is signed in. */
 function RequireAuth({ children }) {
@@ -60,6 +62,22 @@ export default function App() {
             element={
               <RequireAuth>
                 <CourseDetail />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/course/:id/reviews"
+            element={
+              <RequireAuth>
+                <CourseReviewsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/course/:id/summary-files"
+            element={
+              <RequireAuth>
+                <CourseSummaryFilesPage />
               </RequireAuth>
             }
           />

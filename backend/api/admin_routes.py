@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 
 from api.dependencies import require_admin
 from domain.errors import ServiceError
@@ -52,6 +53,30 @@ def admin_review_action(
 ):
     ip = request.client.host if request.client else None
     return invoke(service.apply_action, review_id, payload.action, admin, ip)
+
+
+@router.get("/admin/summary-files")
+def admin_summary_files(admin: dict = Depends(require_admin)):
+    return invoke(service.list_hidden_summary_files)
+
+
+@router.get("/admin/summary-files/{file_id}/download")
+def admin_summary_file_download(file_id: int, admin: dict = Depends(require_admin)):
+    path, filename, mime_type = invoke(service.get_summary_file_download, file_id)
+    return FileResponse(path, filename=filename, media_type=mime_type)
+
+
+@router.post("/admin/summary-files/{file_id}/action")
+def admin_summary_file_action(
+    file_id: int,
+    payload: AdminAction,
+    request: Request,
+    admin: dict = Depends(require_admin),
+):
+    ip = request.client.host if request.client else None
+    return invoke(
+        service.apply_summary_file_action, file_id, payload.action, admin, ip,
+    )
 
 
 @router.get("/audit-logs")

@@ -45,7 +45,7 @@ services:
       # Docker network). Kept on localhost for your own debugging/curl.
       - "127.0.0.1:5000:5000"
     volumes:
-      # Review attachments (FR-9/FR-10) persisted outside the container.
+      # Course-level summary files and profile media persist outside the container.
       - uploads_data:/app/uploads
       - avatars_data:/app/avatars
     depends_on:

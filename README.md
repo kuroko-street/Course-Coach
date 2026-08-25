@@ -29,7 +29,7 @@ Then open:
 
 The database schema and mock data are loaded automatically from
 `db/init.sql` on first startup. `backend` waits for `db` to be **healthy**
-(via `pg_isready`) before starting. Review attachments (Sprint 2) are
+(via `pg_isready`) before starting. Course-level summary files are
 persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
 `backend` container.
 
@@ -49,21 +49,24 @@ persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
    instructor(s) teaching it with their teaching/grading style, the
    term/section offerings from the (mocked) university registrar API, and
    the `ACTIVE` reviews. Each review shows its six-aspect rating breakdown
-   (satisfaction/difficulty/workload/content/teaching/exam), a like button,
-   a comment thread, and file attachments.
+   (satisfaction/recommendation/workload/content/teaching/exam), a like button,
+   and a comment thread. Reviews and summary files are separate resources.
    - The write-review form only shows a term/section you were actually
      **enrolled** in (see `enrollments` below) — if you have zero
      enrollments for this course, the form is replaced with a notice
      instead. `somchai_s` can review CS101 (`2567`/term `2`/sec `001`,
      enrolled but not yet reviewed); switch to `malee_p` and this course's
      form is gone because she was never enrolled in it.
-   - Submit a review using the star-rating form at the bottom; you can
-     optionally attach a document (20MB cap) in that same form.
+   - **+ รีวิว** opens the review form in a modal. Deleting that review
+     restores the right to review the same enrolled term again.
    - As the review's author, use **✎ แก้ไข** / **🗑 ลบ** to edit or
-     soft-delete it — the edit form has its own optional file-attach field
-     too, for adding a document after the fact. Attaching only ever happens
-     from these two forms; the posted review just lists whatever's already
-     attached, downloadable by anyone.
+     soft-delete it.
+   - **+ อัปโหลด** opens a separate summary-file modal. Only students with
+     a matching enrollment can upload. Each request is one upload round,
+     contains 1–3 files (20MB each), and each student gets two active rounds
+     per course/year/semester. Deleting every file in a round restores it.
+   - **ดูทั้งหมด** opens per-course review and file pages. Reviews sort by
+     newest/likes/comments; files group by academic year and semester.
    - Hit **⚑ Report** on a review **five times**: on the fifth report the
      review is auto-hidden and vanishes from the list.
 4. **`/dashboard`** — summary cards plus separate rankings for review count,
@@ -79,15 +82,15 @@ persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
    for.
 6. **`/admin` Admin Queue** — an existing administrator must grant the local
    `ADMIN` role to the appropriate verified KMITL user in the database. The
-   hidden review is then available in the moderation queue.
+   hidden review or summary file is then available in its moderation queue.
    **✓ Keep** restores it (`status = ACTIVE`, `report_count = 0`) while
    preserving the `review_reports` history; **🗑 Delete** soft-deletes it
    (`status = DELETED`).
 
 Trying to open `/admin` as a STUDENT is blocked in the router *and*
 rejected with `403` by the API. Editing/deleting someone else's review, or
-uploading a file to someone else's review, is likewise blocked in the UI
-*and* rejected with `403` by the API.
+uploading a summary file without a matching enrollment, is likewise blocked
+in the UI *and* rejected with `403` by the API.
 
 ## Seed users
 
@@ -101,8 +104,8 @@ uploading a file to someone else's review, is likewise blocked in the UI
 
 - **Transactions:** every endpoint that writes more than one table
   (`reviews` + `audit_logs` on create/edit/delete, `review_reports` +
-  `reviews` + `audit_logs` on report, `review_files` + `audit_logs` on
-  upload) commits or rolls back as a single unit. Transaction boundaries live
+  `reviews` + `audit_logs` on report, or summary-file batch + files + audit
+  logs on upload) commits or rolls back as a single unit. Transaction boundaries live
   in `backend/services/`; repositories never commit independently.
 - **Row locking:** the report, edit, and delete endpoints take
   `SELECT … FOR UPDATE` on the review row so concurrent requests cannot
@@ -113,9 +116,8 @@ uploading a file to someone else's review, is likewise blocked in the UI
 - **Server-side authentication and authorisation:** Google Workspace proves
   identity, while a signed HttpOnly cookie carries the application session.
   The backend re-resolves that user and checks the role in the database.
-  Review edit/delete and file upload re-check that
-  the caller is the review's own author. Hiding a button is never the only
-  protection.
+  Review edit/delete re-check ownership, while summary-file upload re-checks
+  the enrollment and term server-side. Hiding a button is never the only protection.
 - **Soft delete:** reviews are never physically removed — author or admin
   `DELETE` sets `status = 'DELETED'`, keeping the audit trail intact.
 - **Complete-or-reject writes:** a review cannot be saved without all six
@@ -154,15 +156,21 @@ uploading a file to someone else's review, is likewise blocked in the UI
 | DELETE | `/api/reviews/{id}/like`              | login       | Unlike a review                                         |
 | GET    | `/api/reviews/{id}/comments`          | —           | List comments on a review                                |
 | POST   | `/api/reviews/{id}/comments`          | login       | Post a comment on a review                               |
-| POST   | `/api/reviews/{id}/files`             | own review  | Attach a file (multipart, 20MB cap)                      |
-| GET    | `/api/reviews/{id}/files`             | —           | List a review's attachments                              |
-| GET    | `/api/files/{id}/download`            | —           | Download an attachment                                   |
+| GET    | `/api/courses/{id}/summary-files`     | login       | List active summary files for this course                |
+| POST   | `/api/courses/{id}/summary-files`     | enrolled    | Upload 1–3 files as one round (multipart, 20MB each)     |
+| GET    | `/api/summary-files/{id}/download`    | login       | Download an active summary file                          |
+| POST   | `/api/summary-files/{id}/like`        | login       | Toggle a like on a summary file                          |
+| POST   | `/api/summary-files/{id}/comments`    | login       | Comment on a summary file                                |
+| POST   | `/api/summary-files/{id}/report`      | login       | Report; auto-hide at 5 reports                           |
+| DELETE | `/api/summary-files/{id}`             | owner/admin | Soft-delete; restore round when its last file is deleted |
 | GET    | `/api/dashboard/rankings?metric=&department=&min_reviews=` | — | Dashboard rankings by engagement or rating aspect |
 | GET    | `/api/dashboard/summary`              | —           | Dashboard totals for courses, active reviews, reviewers, likes and comments |
 | GET    | `/api/users/{id}/profile`             | —           | Reviewer profile: averages, total likes, review history   |
 | GET    | `/api/users/{id}/enrollments`         | self-only   | "วิชาที่มีสิทธิ์รีวิว": every course/term the user is enrolled in + reviewed flag |
 | GET    | `/api/admin/reports`                  | ADMIN       | Moderation queue (`HIDDEN` reviews)                       |
 | POST   | `/api/admin/reviews/{id}/action`      | ADMIN       | `{"action": "KEEP" \| "DELETE"}`                          |
+| GET    | `/api/admin/summary-files`            | ADMIN       | Moderation queue (`HIDDEN` summary files)                 |
+| POST   | `/api/admin/summary-files/{id}/action`| ADMIN       | Keep or delete a reported summary file                   |
 | GET    | `/api/audit-logs?limit=`              | ADMIN       | Recent audit trail                                        |
 
 ¹ `GET /api/courses/{id}/reviews` uses the optional session cookie to
@@ -191,7 +199,7 @@ not public data). Admin endpoints require the session user to have the local
   "semester": "1",
   "section": "001",
   "rating_satisfaction": 5,
-  "rating_difficulty": 2,
+  "rating_recommendation": 4,
   "rating_workload": 2,
   "rating_content": 4,
   "rating_teaching": 5,

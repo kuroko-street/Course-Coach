@@ -56,7 +56,7 @@ def make_item(course_id, academic_year, semester, credits=3, avg_workload=None):
         "course_name": f"Course {course_id}",
         "credits": credits,
         "avg_satisfaction": None,
-        "avg_difficulty": None,
+        "avg_recommendation": None,
         "avg_workload": avg_workload,
     }
 

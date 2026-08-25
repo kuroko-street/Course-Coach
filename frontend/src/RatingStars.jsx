@@ -1,11 +1,7 @@
-/**
- * FR-7: reviews are scored on six separate aspects (1-5 each) instead of one
- * overall number. These small components render/collect that breakdown
- * consistently everywhere it shows up (review form, review card, profile).
- */
+/** Shared six-question Likert scale used by review forms and rating displays. */
 export const RATING_FIELDS = [
   "satisfaction",
-  "difficulty",
+  "recommendation",
   "workload",
   "content",
   "teaching",
@@ -13,82 +9,92 @@ export const RATING_FIELDS = [
 ];
 
 export const RATING_LABELS = {
-  satisfaction: "ความพึงพอใจรวม",
-  difficulty: "ความยากง่าย",
-  workload: "ภาระงาน",
-  content: "เนื้อหา",
-  teaching: "การสอน",
-  exam: "การสอบ",
+  satisfaction: "ความพึงพอใจกับรายวิชานี้",
+  recommendation: "ความต้องการแนะนำรายวิชานี้ให้กับนักศึกษาคนอื่น",
+  workload: "งานและการบ้านของรายวิชานี้มีความเหมาะสม",
+  content: "เนื้อหาและสื่อการสอนของรายวิชานี้มีคุณภาพ",
+  teaching: "อาจารย์อธิบายเนื้อหาได้เข้าใจง่าย",
+  exam: "การสอบและการให้คะแนนมีความเหมาะสมและยุติธรรม",
 };
 
+export const RATING_SHORT_LABELS = {
+  satisfaction: "ความพึงพอใจ",
+  recommendation: "การแนะนำรายวิชา",
+  workload: "งานและการบ้าน",
+  content: "เนื้อหาและสื่อการสอน",
+  teaching: "การอธิบายของอาจารย์",
+  exam: "การสอบและการให้คะแนน",
+};
+
+const LIKERT_OPTIONS = [
+  { value: 1, label: "ไม่เห็นด้วยอย่างยิ่ง" },
+  { value: 2, label: "ไม่เห็นด้วย" },
+  { value: 3, label: "ปานกลาง" },
+  { value: 4, label: "เห็นด้วย" },
+  { value: 5, label: "เห็นด้วยอย่างยิ่ง" },
+];
+
 export function defaultRatings(source = 3) {
-  return RATING_FIELDS.reduce((acc, f) => ({ ...acc, [f]: source }), {});
+  return RATING_FIELDS.reduce((acc, field) => ({ ...acc, [field]: source }), {});
 }
 
-/** Read the six `rating_*` columns off a review row into a plain {field: n} map. */
 export function ratingsFromReview(review) {
   return RATING_FIELDS.reduce(
-    (acc, f) => ({ ...acc, [f]: Number(review[`rating_${f}`]) }),
+    (acc, field) => ({ ...acc, [field]: Number(review[`rating_${field}`]) }),
     {}
   );
 }
 
 export function StarDisplay({ value }) {
-  const n = Number(value) || 0;
+  const score = Number(value) || 0;
   return (
-    <span className="star-display" aria-label={`${n} / 5`}>
-      {"★".repeat(n)}
-      {"☆".repeat(Math.max(0, 5 - n))}
+    <span className="star-display" aria-label={`${score} / 5`}>
+      {"★".repeat(score)}
+      {"☆".repeat(Math.max(0, 5 - score))}
     </span>
   );
 }
 
-export function StarInput({ label, value, onChange }) {
+function LikertInput({ field, label, value, onChange }) {
   return (
-    <div className="star-input">
-      <label>{label}</label>
-      <div className="star-row" role="radiogroup" aria-label={label}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            type="button"
-            key={n}
-            className={`star-btn ${n <= value ? "star-filled" : ""}`}
-            onClick={() => onChange(n)}
-            aria-pressed={n === value}
-          >
-            ★
-          </button>
+    <fieldset className="likert-question">
+      <legend>{label}</legend>
+      <div className="likert-options">
+        {LIKERT_OPTIONS.map((option) => (
+          <label className={`likert-option ${value === option.value ? "selected" : ""}`} key={option.value}>
+            <input type="radio" name={`rating-${field}`} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} />
+            <span className="likert-radio" aria-hidden="true" />
+            <span>{option.value}</span>
+          </label>
         ))}
       </div>
-    </div>
+    </fieldset>
   );
 }
 
-/** Compact read-only grid of all six aspects, e.g. on a review card. */
 export function RatingBreakdown({ ratings }) {
   return (
     <div className="rating-breakdown">
-      {RATING_FIELDS.map((f) => (
-        <div className="rating-row" key={f}>
-          <span className="rating-label">{RATING_LABELS[f]}</span>
-          <StarDisplay value={ratings[f]} />
+      {RATING_FIELDS.map((field) => (
+        <div className="rating-row" key={field}>
+          <span className="rating-label">{RATING_LABELS[field]}</span>
+          <StarDisplay value={ratings[field]} />
         </div>
       ))}
     </div>
   );
 }
 
-/** Editable grid of all six aspects, e.g. in the write/edit review form. */
 export function RatingForm({ ratings, onChange }) {
   return (
-    <div className="rating-form-grid">
-      {RATING_FIELDS.map((f) => (
-        <StarInput
-          key={f}
-          label={RATING_LABELS[f]}
-          value={ratings[f]}
-          onChange={(n) => onChange({ ...ratings, [f]: n })}
-        />
+    <div className="likert-form">
+      <div className="likert-scale" aria-label="ความหมายของคะแนน">
+        {LIKERT_OPTIONS.map((option) => (
+          <span key={option.value}><strong>{option.value}</strong> — {option.label}</span>
+        ))}
+      </div>
+      {RATING_FIELDS.map((field) => (
+        <LikertInput key={field} field={field} label={RATING_LABELS[field]} value={ratings[field]} onChange={(score) => onChange({ ...ratings, [field]: score })} />
       ))}
     </div>
   );

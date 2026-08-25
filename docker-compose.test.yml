@@ -25,6 +25,8 @@ services:
       - ./db/migrations/002_upgrade_sprint2.sql:/docker-entrypoint-initdb.d/migrate_002_upgrade_sprint2.sql:ro
       - ./db/migrations/003_study_plans.sql:/docker-entrypoint-initdb.d/migrate_003_study_plans.sql:ro
       - ./db/migrations/008_user_display_name.sql:/docker-entrypoint-initdb.d/migrate_008_user_display_name.sql:ro
+      - ./db/migrations/009_summary_files.sql:/docker-entrypoint-initdb.d/migrate_009_summary_files.sql:ro
+      - ./db/migrations/010_review_rating_criteria.sql:/docker-entrypoint-initdb.d/migrate_010_review_rating_criteria.sql:ro
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:

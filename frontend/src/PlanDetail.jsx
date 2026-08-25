@@ -336,7 +336,7 @@ export default function PlanDetail() {
                     )}
                     <div className="plan-item-ratings">
                       {item.avg_satisfaction != null
-                        ? `พึงพอใจ ${item.avg_satisfaction} · ภาระงาน ${item.avg_workload ?? "–"} · ความยาก ${item.avg_difficulty ?? "–"}`
+                        ? `พึงพอใจ ${item.avg_satisfaction} · แนะนำ ${item.avg_recommendation ?? "–"} · งานเหมาะสม ${item.avg_workload ?? "–"}`
                         : "ยังไม่มีรีวิว"}
                     </div>
                   </div>

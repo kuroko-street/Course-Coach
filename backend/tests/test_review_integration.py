@@ -65,6 +65,15 @@ def test_delete_is_soft_delete(client, db_conn, created_review):
     with db_conn.cursor() as cur:
         cur.execute("SELECT status FROM reviews WHERE review_id = %s", (created_review,))
         assert cur.fetchone()[0] == "DELETED"
+    enrollments = client.get(
+        "/api/courses/2/enrollments/me", headers={"X-User-Id": "1"}
+    )
+    assert enrollments.status_code == 200
+    deleted_term = next(
+        row for row in enrollments.json()["enrollments"]
+        if row["academic_year"] == 2567 and row["semester"] == "2"
+    )
+    assert deleted_term["reviewed"] is False
 
 
 def test_report_uses_authenticated_identity(client, db_conn, created_review):

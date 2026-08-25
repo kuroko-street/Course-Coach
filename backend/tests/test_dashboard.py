@@ -39,11 +39,23 @@ def test_dashboard_returns_all_six_rating_averages(client):
     rows = response.json()["rankings"]
     assert [row["course_code"] for row in rows] == ["CS101", "SCI101", "MTH201"]
     assert set(rows[0]) >= {
-        "avg_satisfaction", "avg_difficulty", "avg_workload",
+        "avg_satisfaction", "avg_recommendation", "avg_workload",
         "avg_content", "avg_teaching", "avg_exam",
         "review_count", "reviewer_count", "total_likes", "total_comments",
     }
     assert rows[0]["metric_value"] == 5.0
+
+
+def test_dashboard_ranks_by_recommendation(client):
+    response = client.get(
+        "/api/dashboard/rankings", params={"metric": "recommendation"}
+    )
+
+    assert response.status_code == 200
+    rows = response.json()["rankings"]
+    assert all("avg_recommendation" in row for row in rows)
+    values = [float(row["metric_value"]) for row in rows if row["metric_value"] is not None]
+    assert values == sorted(values, reverse=True)
 
 
 def test_dashboard_filters_by_department(client):
