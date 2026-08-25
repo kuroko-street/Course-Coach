@@ -136,11 +136,14 @@ class ReviewRepository:
             cur.execute(
                 """
                 INSERT INTO review_reports (review_id, reporter_id)
-                VALUES (%s, %s) RETURNING report_id;
+                VALUES (%s, %s)
+                ON CONFLICT (review_id, reporter_id) DO NOTHING
+                RETURNING report_id;
                 """,
                 (review_id, reporter_id),
             )
-            return cur.fetchone()["report_id"]
+            report = cur.fetchone()
+            return report["report_id"] if report else None
 
     def increment_report_count(self, conn, review_id, threshold):
         with dict_cursor(conn) as cur:

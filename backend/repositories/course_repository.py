@@ -23,7 +23,10 @@ class CourseRepository:
 
     def list_departments(self, conn):
         with dict_cursor(conn) as cur:
-            cur.execute("SELECT DISTINCT department FROM courses ORDER BY department;")
+            cur.execute(
+                "SELECT DISTINCT department FROM courses "
+                "WHERE is_active = TRUE ORDER BY department;"
+            )
             return [row["department"] for row in cur.fetchall()]
 
     def list_tags(self, conn):
@@ -36,7 +39,9 @@ class CourseRepository:
         terms = self._plain_terms(query)
         prefix_query = " & ".join(f"{term}:*" for term in terms)
 
-        clauses, filter_params = [], []
+        # Inactive courses remain in the database for historical reviews and
+        # auditability, but they must not appear in the public catalog/search.
+        clauses, filter_params = ["c.is_active = TRUE"], []
         if query:
             clauses.append(
                 "(c.search_document @@ q.web_query "
@@ -235,7 +240,7 @@ class CourseRepository:
             cur.execute(
                 """
                 SELECT
-                    (SELECT COUNT(*) FROM courses) AS course_count,
+                    (SELECT COUNT(*) FROM courses WHERE is_active = TRUE) AS course_count,
                     (SELECT COUNT(*) FROM reviews WHERE status = 'ACTIVE') AS review_count,
                     (SELECT COUNT(DISTINCT reviewer_id) FROM reviews
                      WHERE status = 'ACTIVE') AS reviewer_count,
@@ -263,7 +268,10 @@ class CourseRepository:
             "teaching": "rs.avg_teaching",
             "exam": "rs.avg_exam",
         }[metric]
-        clauses, params = ["COALESCE(rs.review_count, 0) >= %s"], [min_reviews]
+        clauses, params = [
+            "c.is_active = TRUE",
+            "COALESCE(rs.review_count, 0) >= %s",
+        ], [min_reviews]
         if department and department.strip():
             clauses.append("c.department = %s")
             params.append(department.strip())

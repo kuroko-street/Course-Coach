@@ -36,6 +36,42 @@ def db_conn():
 
 
 @pytest.fixture()
+def admin_catalog_cleanup(db_conn):
+    """Remove catalog records created by admin tests, even if a test fails."""
+    yield
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT course_id FROM courses WHERE course_code IN ('ADM999', 'IMP999')"
+        )
+        course_ids = [row[0] for row in cur.fetchall()]
+        if course_ids:
+            cur.execute(
+                "DELETE FROM audit_logs WHERE action = 'MANAGE_COURSE' "
+                "AND target_id = ANY(%s)",
+                (course_ids,),
+            )
+            cur.execute("DELETE FROM curriculum_courses WHERE course_id = ANY(%s)", (course_ids,))
+            cur.execute("DELETE FROM course_tags WHERE course_id = ANY(%s)", (course_ids,))
+            cur.execute("DELETE FROM course_instructors WHERE course_id = ANY(%s)", (course_ids,))
+            cur.execute("DELETE FROM courses WHERE course_id = ANY(%s)", (course_ids,))
+        cur.execute(
+            "DELETE FROM curriculums WHERE curriculum_name IN "
+            "('Test Curriculum Admin', 'Import Curriculum')"
+        )
+        cur.execute(
+            "DELETE FROM instructors i WHERE i.name IN "
+            "('อ.เพิ่มจากหน้า Admin', 'อ.ทดสอบ ระบบ') "
+            "AND NOT EXISTS (SELECT 1 FROM course_instructors ci "
+            "WHERE ci.instructor_id = i.instructor_id)"
+        )
+        cur.execute(
+            "DELETE FROM tags t WHERE t.tag_name IN ('admin-created', 'ทดลอง') "
+            "AND NOT EXISTS (SELECT 1 FROM course_tags ct WHERE ct.tag_id = t.tag_id)"
+        )
+    db_conn.commit()
+
+
+@pytest.fixture()
 def valid_review_payload():
     return {
         "course_id": 2,
