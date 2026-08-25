@@ -15,7 +15,8 @@ CREATE TYPE user_role     AS ENUM ('STUDENT', 'ADMIN');
 CREATE TYPE review_status AS ENUM ('ACTIVE', 'HIDDEN', 'DELETED');
 CREATE TYPE audit_action  AS ENUM (
     'LOGIN', 'WRITE_REVIEW', 'EDIT_REVIEW', 'DELETE_REVIEW',
-    'UPLOAD_FILE', 'FLAG_REPORT', 'MODERATE_REVIEW', 'MANAGE_COURSE'
+    'UPLOAD_FILE', 'FLAG_REPORT', 'MODERATE_REVIEW', 'MANAGE_COURSE',
+    'IMPORT_ENROLLMENT'
 );
 
 -- ----------------------------------------------------------------
@@ -26,6 +27,7 @@ CREATE TABLE users (
     username           VARCHAR(100) NOT NULL UNIQUE,
     email              VARCHAR(255) NOT NULL UNIQUE,
     google_sub         VARCHAR(255) NULL UNIQUE,
+    student_number     VARCHAR(20)  NULL UNIQUE,
     role               user_role    NOT NULL DEFAULT 'STUDENT',
     avatar_url         VARCHAR(500) NULL,
     is_mock            BOOLEAN      NOT NULL DEFAULT FALSE,
@@ -235,15 +237,15 @@ CREATE INDEX idx_enrollments_course    ON enrollments (course_id);
 -- Users: two students, one admin, and three mock reporters.
 -- No avatar_url for mock users: the UI falls back to a generic silhouette
 -- placeholder (see frontend/src/Avatar.jsx) instead of loading photos.
-INSERT INTO users (username, email, role, avatar_url, is_mock) VALUES
-    ('somchai_s',   'somchai.s@example.ac.th', 'STUDENT', NULL, TRUE),
-    ('malee_p',     'malee.p@example.ac.th',   'STUDENT', NULL, TRUE),
-    ('admin_wichai','wichai.a@example.ac.th',  'ADMIN',   NULL, TRUE),
+INSERT INTO users (username, email, student_number, role, avatar_url, is_mock) VALUES
+    ('somchai_s',   'somchai.s@example.ac.th', '65000001', 'STUDENT', NULL, TRUE),
+    ('malee_p',     'malee.p@example.ac.th',   '65000002', 'STUDENT', NULL, TRUE),
+    ('admin_wichai','wichai.a@example.ac.th',  NULL,       'ADMIN',   NULL, TRUE),
     -- These background-only accounts make the seeded report count realistic,
     -- but are intentionally hidden from the development login picker.
-    ('reporter_1',  'reporter1@example.ac.th', 'STUDENT', NULL, FALSE),
-    ('reporter_2',  'reporter2@example.ac.th', 'STUDENT', NULL, FALSE),
-    ('reporter_3',  'reporter3@example.ac.th', 'STUDENT', NULL, FALSE);
+    ('reporter_1',  'reporter1@example.ac.th', NULL, 'STUDENT', NULL, FALSE),
+    ('reporter_2',  'reporter2@example.ac.th', NULL, 'STUDENT', NULL, FALSE),
+    ('reporter_3',  'reporter3@example.ac.th', NULL, 'STUDENT', NULL, FALSE);
 
 -- Courses (3) - all Faculty of Science, spread across departments so the
 -- department filter has something to actually filter. Deep detail fields

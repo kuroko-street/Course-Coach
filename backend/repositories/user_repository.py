@@ -6,7 +6,7 @@ class UserRepository:
         with dict_cursor(conn) as cur:
             cur.execute(
                 """
-                SELECT user_id, username, email, role, avatar_url,
+                SELECT user_id, username, email, student_number, role, avatar_url,
                        is_report_blocked, blocked_until
                 FROM users ORDER BY user_id;
                 """
@@ -17,7 +17,7 @@ class UserRepository:
         with dict_cursor(conn) as cur:
             cur.execute(
                 """
-                SELECT user_id, username, email, role, avatar_url,
+                SELECT user_id, username, email, student_number, role, avatar_url,
                        is_report_blocked, blocked_until
                 FROM users
                 WHERE is_mock = TRUE
@@ -30,7 +30,7 @@ class UserRepository:
         with dict_cursor(conn) as cur:
             cur.execute(
                 """
-                SELECT user_id, username, email, role, avatar_url,
+                SELECT user_id, username, email, student_number, role, avatar_url,
                        is_report_blocked, blocked_until
                 FROM users WHERE user_id = %s;
                 """,
@@ -40,7 +40,7 @@ class UserRepository:
 
     def find_or_create_google_user(self, conn, google_sub, email, display_name, avatar_url):
         """Link a verified Google identity without changing an existing role."""
-        fields = """user_id, username, email, role, avatar_url,
+        fields = """user_id, username, email, student_number, role, avatar_url,
                     is_report_blocked, blocked_until"""
         with dict_cursor(conn) as cur:
             cur.execute(f"SELECT {fields} FROM users WHERE google_sub = %s;", (google_sub,))
@@ -92,7 +92,7 @@ class UserRepository:
         with dict_cursor(conn) as cur:
             cur.execute(
                 """
-                SELECT user_id, username, email, role, avatar_url,
+                SELECT user_id, username, email, student_number, role, avatar_url,
                        is_report_blocked, blocked_until
                 FROM users
                 WHERE user_id = %s AND is_mock = TRUE;
@@ -104,7 +104,7 @@ class UserRepository:
     def get_profile(self, conn, user_id):
         with dict_cursor(conn) as cur:
             cur.execute(
-                "SELECT user_id, username, avatar_url, role FROM users WHERE user_id = %s;",
+                "SELECT user_id, username, student_number, avatar_url, role FROM users WHERE user_id = %s;",
                 (user_id,),
             )
             user = cur.fetchone()

@@ -59,3 +59,17 @@ class CourseImportRow(BaseModel):
 
 class CourseImportRequest(BaseModel):
     rows: list[CourseImportRow] = Field(min_length=1, max_length=500)
+
+
+class StudentEnrollmentImportRow(BaseModel):
+    row_number: int = Field(ge=2)
+    student_number: str = Field(pattern=r"^\d{8}$")
+    email: str = Field(pattern=r"^[^@\s]+@kmitl\.ac\.th$", max_length=255)
+    course_code: str = Field(min_length=2, max_length=20)
+    academic_year: int = Field(ge=2500, le=3000)
+    semester: str = Field(min_length=1, max_length=20)
+    section: str = Field(min_length=1, max_length=20)
+
+
+class StudentEnrollmentImportRequest(BaseModel):
+    rows: list[StudentEnrollmentImportRow] = Field(min_length=1, max_length=2000)

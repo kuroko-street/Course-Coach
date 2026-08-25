@@ -726,6 +726,29 @@ textarea {
 .import-ok { color: var(--success); font-weight: 600; }
 .import-skip { color: #546e7a; font-weight: 600; }
 .import-update { color: #b26a00; font-weight: 600; }
+.google-linked { color: var(--success); font-size: 12px; font-weight: 700; }
+
+.student-admin-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.student-admin-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.status-linked,
+.status-waiting {
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.status-linked { color: var(--success); background: #e8f5e9; }
+.status-waiting { color: #8a5a00; background: #fff4d6; }
 
 .empty-state {
   text-align: center;

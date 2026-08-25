@@ -15,8 +15,10 @@ export default function Admin() {
   const [courses, setCourses] = useState([]);
   const [instructors, setInstructors] = useState([]);
   const [curriculums, setCurriculums] = useState([]);
+  const [students, setStudents] = useState([]);
   const [courseForm, setCourseForm] = useState(emptyCourse);
   const [importPreview, setImportPreview] = useState(null);
+  const [studentImportPreview, setStudentImportPreview] = useState(null);
   const [curriculumForm, setCurriculumForm] = useState({ curriculum_name: "", academic_year: "2569", department: "", degree_level: "ปริญญาตรี" });
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,10 +29,10 @@ export default function Admin() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [reportData, summaryData, courseData, curriculumData, instructorData] = await Promise.all([
-        api("/admin/reports", { userId: user.user_id }), api("/admin/reports/summary", { userId: user.user_id }), api("/admin/courses", { userId: user.user_id }), api("/admin/curriculums", { userId: user.user_id }), api("/admin/instructors", { userId: user.user_id }),
+      const [reportData, summaryData, courseData, curriculumData, instructorData, studentData] = await Promise.all([
+        api("/admin/reports", { userId: user.user_id }), api("/admin/reports/summary", { userId: user.user_id }), api("/admin/courses", { userId: user.user_id }), api("/admin/curriculums", { userId: user.user_id }), api("/admin/instructors", { userId: user.user_id }), api("/admin/students", { userId: user.user_id }),
       ]);
-      setReviews(reportData.reviews || []); setReportSummary(summaryData); setCourses(courseData.courses || []); setCurriculums(curriculumData.curriculums || []); setInstructors(instructorData.instructors || []);
+      setReviews(reportData.reviews || []); setReportSummary(summaryData); setCourses(courseData.courses || []); setCurriculums(curriculumData.curriculums || []); setInstructors(instructorData.instructors || []); setStudents(studentData.students || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }, [user.user_id]);
   useEffect(() => { load(); }, [load]);
@@ -120,12 +122,31 @@ export default function Admin() {
       flash(`ประมวลผล ${data.imported_count} รายการ · เพิ่ม/อัปเดต ${data.imported_count - skipped} · ข้ามข้อมูลที่ตรงกัน ${skipped}`); setImportPreview(null); await load();
     } catch (err) { setError(err.message); } finally { setBusyId(null); }
   }
+  async function previewStudentImport(event) {
+    event.preventDefault();
+    const file = event.target.elements.student_file.files[0];
+    if (!file) { setError("เลือกไฟล์ข้อมูลนักศึกษาก่อน"); return; }
+    setBusyId("student-import-preview"); setError(""); setSuccess("");
+    try {
+      const data = await apiUpload("/admin/students/import/preview", { file, userId: user.user_id });
+      setStudentImportPreview(data);
+    } catch (err) { setError(err.message); setStudentImportPreview(null); } finally { setBusyId(null); }
+  }
+  async function confirmStudentImport() {
+    if (!studentImportPreview || studentImportPreview.invalid_count) return;
+    setBusyId("student-import-confirm");
+    try {
+      const data = await api("/admin/students/import", { method: "POST", userId: user.user_id, body: { rows: studentImportPreview.rows } });
+      flash(`ประมวลผล ${data.processed_count} รายการ · เพิ่มสิทธิ์ ${data.created_count} · ข้ามข้อมูลเดิม ${data.skipped_count}`);
+      setStudentImportPreview(null); await load();
+    } catch (err) { setError(err.message); } finally { setBusyId(null); }
+  }
   const setCourse = (key) => (value) => setCourseForm({ ...courseForm, [key]: value });
   const setCurriculum = (key) => (value) => setCurriculumForm({ ...curriculumForm, [key]: value });
 
   return <section>
     <h1>ผู้ดูแลระบบ</h1><p className="muted">ตรวจสอบรีวิว และจัดการข้อมูลรายวิชา/หลักสูตรสำหรับหน้า Catalog</p>
-    <div className="admin-tabs"><button className={tab === "reports" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("reports")}>คิวรีวิว ({reviews.length})</button><button className={tab === "courses" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("courses")}>จัดการรายวิชา</button><button className={tab === "curriculums" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("curriculums")}>หลักสูตร</button><button className={tab === "import" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("import")}>Import Excel</button></div>
+    <div className="admin-tabs"><button className={tab === "reports" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("reports")}>คิวรีวิว ({reviews.length})</button><button className={tab === "courses" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("courses")}>จัดการรายวิชา</button><button className={tab === "curriculums" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("curriculums")}>หลักสูตร</button><button className={tab === "import" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("import")}>Import วิชา</button><button className={tab === "students" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("students")}>นักศึกษา/สิทธิ์รีวิว</button></div>
     {error && <div className="alert alert-error">{error}</div>}{success && <div className="alert alert-success">{success}</div>}
     {tab === "reports" && <Reports loading={loading} reviews={reviews} summary={reportSummary} queueOpen={queueOpen} onToggleQueue={() => setQueueOpen((open) => !open)} busyId={busyId} onAction={handleAction} />}
     {tab === "courses" && <>
@@ -149,7 +170,27 @@ export default function Admin() {
     </>}
     {tab === "curriculums" && <><h2>เพิ่มหลักสูตร</h2><form className="card" onSubmit={saveCurriculum}><div className="row"><Field label="ชื่อหลักสูตร" value={curriculumForm.curriculum_name} onChange={setCurriculum("curriculum_name")} required /><Field label="ปีหลักสูตร" type="number" value={curriculumForm.academic_year} onChange={setCurriculum("academic_year")} required /></div><div className="row"><Field label="ภาควิชา" value={curriculumForm.department} onChange={setCurriculum("department")} required /><Field label="ระดับ" value={curriculumForm.degree_level} onChange={setCurriculum("degree_level")} required /></div><button disabled={busyId !== null}>{busyId === "curriculum-form" ? "กำลังบันทึก…" : "เพิ่มหลักสูตร"}</button></form><h2>หลักสูตรที่ใช้งาน</h2><div className="admin-list">{curriculums.map((c) => <article className="card" key={c.curriculum_id}><strong>{c.curriculum_name} ({c.academic_year})</strong><div className="meta">{c.department} · {c.degree_level}</div></article>)}</div></>}
     {tab === "import" && <><h2>นำเข้ารายวิชาจาก Excel</h2><p className="muted">อัปโหลด .xlsx สูงสุด 5MB ระบบจะตรวจข้อมูลและแสดง preview ก่อนบันทึกจริง</p><a className="btn btn-ghost" href="/course-import-template.xlsx" download>ดาวน์โหลดไฟล์ตัวอย่าง</a><form className="card import-form" onSubmit={previewImport}><div><label>ไฟล์ Excel (.xlsx)</label><input name="excel_file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required /></div><button disabled={busyId !== null}>{busyId === "import-preview" ? "กำลังตรวจสอบ…" : "ตรวจสอบไฟล์"}</button></form>{importPreview && <div className="card"><h2>ตัวอย่างข้อมูลก่อนนำเข้า</h2><p className={importPreview.invalid_count ? "warn" : "muted"}>ใช้ได้ {importPreview.valid_count} แถว · ผิด {importPreview.invalid_count} แถว</p><div className="import-table-wrap"><table className="import-table"><thead><tr><th>แถว</th><th>วิชา</th><th>หลักสูตร</th><th>ปี/เทอม</th><th>ผลตรวจ</th></tr></thead><tbody>{importPreview.rows.map((row) => <tr key={row.row_number}><td>{row.row_number}</td><td><strong>{row.course_code}</strong><br />{row.course_name}</td><td>{row.curriculum_name} ({row.curriculum_year})</td><td>{row.recommended_year}/{row.recommended_semester}</td><td>{row.errors.length ? <span className="import-error">{row.errors.join(", ")}</span> : row.operation === "skip" ? <span className="import-skip">ข้อมูลตรงกัน — ข้าม</span> : row.operation === "update" ? <span className="import-update">มีอยู่แล้ว — อัปเดต</span> : <span className="import-ok">รายวิชาใหม่ — เพิ่ม</span>}</td></tr>)}</tbody></table></div><div className="admin-actions"><button disabled={busyId !== null || importPreview.invalid_count > 0} onClick={confirmImport}>{busyId === "import-confirm" ? "กำลังนำเข้า…" : `ยืนยันนำเข้า ${importPreview.valid_count} รายการ`}</button>{importPreview.invalid_count > 0 && <span className="muted">แก้ไขแถวที่ผิดใน Excel แล้วอัปโหลดใหม่</span>}</div></div>}</>}
+    {tab === "students" && <StudentImportPanel students={students} preview={studentImportPreview} busyId={busyId} onPreview={previewStudentImport} onConfirm={confirmStudentImport} />}
   </section>;
+}
+
+function StudentImportPanel({ students, preview, busyId, onPreview, onConfirm }) {
+  const operationLabel = (row) => {
+    if (row.errors.length) return <span className="import-error">{row.errors.join(", ")}</span>;
+    if (row.operation === "skip") return <span className="import-skip">มีสิทธิ์นี้แล้ว — ข้าม</span>;
+    if (row.operation === "create_student") return <span className="import-ok">สร้างบัญชีรอ + เพิ่มสิทธิ์</span>;
+    if (row.operation === "link_existing_user") return <span className="import-update">พบบัญชี Google — ผูกรหัสและเพิ่มสิทธิ์</span>;
+    return <span className="import-ok">เพิ่มสิทธิ์ให้บัญชีเดิม</span>;
+  };
+  return <>
+    <h2>นำเข้าข้อมูลนักศึกษาและสิทธิ์รีวิว</h2>
+    <p className="muted">รองรับ CSV หรือ Excel สูงสุด 5MB ระบบจับคู่บัญชีด้วยอีเมล @kmitl.ac.th และแสดง Preview ก่อนบันทึกจริง</p>
+    <a className="btn btn-ghost" href="/student-enrollment-import-template.csv" download>ดาวน์โหลดไฟล์ CSV ตัวอย่าง</a>
+    <form className="card import-form" onSubmit={onPreview}><div><label>ไฟล์นักศึกษา (.csv หรือ .xlsx)</label><input name="student_file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required /></div><button disabled={busyId !== null}>{busyId === "student-import-preview" ? "กำลังตรวจสอบ…" : "ตรวจสอบไฟล์"}</button></form>
+    {preview && <div className="card"><h2>ตัวอย่างสิทธิ์ก่อนนำเข้า</h2><p className={preview.invalid_count ? "warn" : "muted"}>ใช้ได้ {preview.valid_count} แถว · ผิด {preview.invalid_count} แถว</p><div className="import-table-wrap"><table className="import-table"><thead><tr><th>แถว</th><th>นักศึกษา</th><th>รายวิชา</th><th>ปี/เทอม/ตอน</th><th>ผลตรวจ</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.row_number}><td>{row.row_number}</td><td><strong>{row.student_number}</strong><br />{row.email}{row.google_linked && <><br /><span className="google-linked">เชื่อม Google แล้ว</span></>}</td><td><strong>{row.course_code}</strong><br />{row.course_name}</td><td>{row.academic_year}/{row.semester}/{row.section}</td><td>{operationLabel(row)}</td></tr>)}</tbody></table></div><div className="admin-actions"><button disabled={busyId !== null || preview.invalid_count > 0} onClick={onConfirm}>{busyId === "student-import-confirm" ? "กำลังนำเข้า…" : `ยืนยันเพิ่มสิทธิ์ ${preview.valid_count} รายการ`}</button>{preview.invalid_count > 0 && <span className="muted">แก้ไขแถวที่ผิดแล้วอัปโหลดใหม่ ระบบจะไม่บันทึกบางส่วน</span>}</div></div>}
+    <h2>นักศึกษาที่มีข้อมูลสิทธิ์รีวิว</h2>
+    {!students.length ? <div className="card empty-state"><p className="muted">ยังไม่มีข้อมูลนักศึกษาที่นำเข้า</p></div> : <div className="admin-list">{students.map((student) => <article className="card student-admin-card" key={student.user_id}><div><strong>{student.student_number}</strong><div>{student.email}</div><div className="meta">{student.username}</div></div><div className="student-admin-status"><span className={student.google_linked ? "status-linked" : "status-waiting"}>{student.google_linked ? "เชื่อม Google แล้ว" : "รอ Login ครั้งแรก"}</span><strong>{student.enrollment_count} วิชา</strong></div></article>)}</div>}
+  </>;
 }
 
 function Reports({ loading, reviews, summary, queueOpen, onToggleQueue, busyId, onAction }) {

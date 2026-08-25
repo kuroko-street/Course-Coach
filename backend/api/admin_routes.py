@@ -2,16 +2,26 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from api.dependencies import require_admin
 from domain.errors import ServiceError
-from schemas.admin import AdminAction, CourseImportRequest, CourseManagePayload, CourseStatus, CurriculumCreate, InstructorCreate
+from schemas.admin import (
+    AdminAction,
+    CourseImportRequest,
+    CourseManagePayload,
+    CourseStatus,
+    CurriculumCreate,
+    InstructorCreate,
+    StudentEnrollmentImportRequest,
+)
 from services.course_import_service import CourseImportService
 from services.course_management_service import CourseManagementService
 from services.moderation_service import ModerationService
+from services.student_import_service import StudentImportService
 
 
 router = APIRouter(prefix="/api", tags=["admin"])
 service = ModerationService()
 course_management_service = CourseManagementService()
 course_import_service = CourseImportService(course_management_service)
+student_import_service = StudentImportService()
 
 
 def invoke(operation, *args):
@@ -108,3 +118,28 @@ async def preview_course_import(file: UploadFile = File(...), admin: dict = Depe
 def confirm_course_import(payload: CourseImportRequest, request: Request, admin: dict = Depends(require_admin)):
     ip = request.client.host if request.client else None
     return invoke(course_import_service.confirm, payload.rows, admin, ip)
+
+
+@router.get("/admin/students")
+def admin_students(admin: dict = Depends(require_admin)):
+    return invoke(student_import_service.list_students)
+
+
+@router.post("/admin/students/import/preview")
+async def preview_student_import(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    try:
+        return await student_import_service.preview(file)
+    except ServiceError as exc:
+        raise HTTPException(exc.status_code, exc.detail) from exc
+    except Exception as exc:
+        raise HTTPException(500, str(exc)) from exc
+
+
+@router.post("/admin/students/import")
+def confirm_student_import(
+    payload: StudentEnrollmentImportRequest,
+    request: Request,
+    admin: dict = Depends(require_admin),
+):
+    ip = request.client.host if request.client else None
+    return invoke(student_import_service.confirm, payload.rows, admin, ip)

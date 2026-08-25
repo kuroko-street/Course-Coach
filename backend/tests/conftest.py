@@ -72,6 +72,26 @@ def admin_catalog_cleanup(db_conn):
 
 
 @pytest.fixture()
+def student_import_cleanup(db_conn):
+    email = "student-import-test@kmitl.ac.th"
+    yield {"email": email, "student_number": "67999999"}
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        row = cur.fetchone()
+        if row:
+            user_id = row[0]
+            cur.execute("DELETE FROM audit_logs WHERE user_id = %s", (user_id,))
+            cur.execute(
+                "DELETE FROM audit_logs WHERE action = 'IMPORT_ENROLLMENT' "
+                "AND target_id IN (SELECT enrollment_id FROM enrollments WHERE student_id = %s)",
+                (user_id,),
+            )
+            cur.execute("DELETE FROM enrollments WHERE student_id = %s", (user_id,))
+            cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+    db_conn.commit()
+
+
+@pytest.fixture()
 def valid_review_payload():
     return {
         "course_id": 2,
