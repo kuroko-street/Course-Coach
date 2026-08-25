@@ -1,21 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, apiUpload, fileDownloadUrl } from "./api.js";
+import { api } from "./api.js";
 import { RatingBreakdown, RatingForm, ratingsFromReview } from "./RatingStars.jsx";
 import Avatar from "./Avatar.jsx";
 
-const MAX_FILE_MB = 20;
-
-function formatSize(bytes) {
-  const n = Number(bytes) || 0;
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 /**
- * One review, fully self-contained: rating breakdown, like, comments, file
- * attachments, and (for the author) edit/delete. Report stays owned by the
+ * One review, fully self-contained: rating breakdown, like, comments, and
+ * (for the author) edit/delete. Report stays owned by the
  * parent (CourseDetail) since a successful report can make the whole card
  * disappear from the ACTIVE list.
  */
@@ -37,8 +28,6 @@ export default function ReviewCard({
   const [commentDraft, setCommentDraft] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
 
-  const [files, setFiles] = useState([]);
-
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(() => ({
     content: review.content,
@@ -47,8 +36,6 @@ export default function ReviewCard({
     section: review.section,
     ratings: ratingsFromReview(review),
   }));
-  const [editFile, setEditFile] = useState(null);
-  const [editFileInputKey, setEditFileInputKey] = useState(0);
   const [editBusy, setEditBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -57,9 +44,6 @@ export default function ReviewCard({
   useEffect(() => {
     api(`/reviews/${review.review_id}/comments`)
       .then((data) => setComments(data.comments || []))
-      .catch(() => {});
-    api(`/reviews/${review.review_id}/files`)
-      .then((data) => setFiles(data.files || []))
       .catch(() => {});
   }, [review.review_id]);
 
@@ -114,22 +98,16 @@ export default function ReviewCard({
       section: review.section,
       ratings: ratingsFromReview(review),
     });
-    setEditFile(null);
     setError("");
     setEditing(true);
   }
 
   function cancelEdit() {
-    setEditFile(null);
     setEditing(false);
   }
 
   async function submitEdit(e) {
     e.preventDefault();
-    if (editFile && editFile.size > MAX_FILE_MB * 1024 * 1024) {
-      setError(`ไฟล์ต้องมีขนาดไม่เกิน ${MAX_FILE_MB}MB`);
-      return;
-    }
     setEditBusy(true);
     setError("");
     const body = {
@@ -155,21 +133,6 @@ export default function ReviewCard({
         rating_satisfaction: body.rating_satisfaction,
         edited_at: new Date().toISOString(),
       });
-
-      if (editFile) {
-        try {
-          const created = await apiUpload(`/reviews/${review.review_id}/files`, {
-            file: editFile,
-            userId: user.user_id,
-          });
-          setFiles((prev) => [created, ...prev]);
-        } catch (err) {
-          setError(`บันทึกรีวิวสำเร็จ แต่แนบไฟล์ไม่สำเร็จ: ${err.message}`);
-        }
-      }
-
-      setEditFile(null);
-      setEditFileInputKey((k) => k + 1);
       setEditing(false);
     } catch (err) {
       setError(err.message);
@@ -241,17 +204,6 @@ export default function ReviewCard({
           ratings={editForm.ratings}
           onChange={(ratings) => setEditForm((f) => ({ ...f, ratings }))}
         />
-        <div>
-          <label htmlFor={`edit-file-${review.review_id}`}>
-            แนบไฟล์เอกสารเพิ่มเติม (ถ้ามี, สูงสุด {MAX_FILE_MB}MB)
-          </label>
-          <input
-            key={editFileInputKey}
-            id={`edit-file-${review.review_id}`}
-            type="file"
-            onChange={(e) => setEditFile(e.target.files?.[0] ?? null)}
-          />
-        </div>
         <div className="form-footer">
           <button type="button" className="btn btn-ghost" onClick={cancelEdit}>
             ยกเลิก
@@ -323,24 +275,6 @@ export default function ReviewCard({
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
-
-      {/* Attached files (FR-9 / FR-10). Attaching happens only from the
-          write-review form or the edit form above — this is display/download
-          only, for the author and everyone else alike. */}
-      {files.length > 0 && (
-        <div className="review-files">
-          <ul className="file-list">
-            {files.map((f) => (
-              <li key={f.file_id}>
-                <a href={fileDownloadUrl(f.file_id)} className="file-link">
-                  📎 {f.filename}
-                </a>
-                <span className="muted small"> ({formatSize(f.size_bytes)})</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {/* Comments (FR-13) */}
       <div className="comment-thread">

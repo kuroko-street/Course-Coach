@@ -974,30 +974,6 @@ a.tag-chip:hover,
   font-size: 15px;
 }
 
-/* ---- File attachments ---- */
-.review-files {
-  margin-top: 12px;
-}
-
-.file-list {
-  list-style: none;
-  margin: 0 0 8px;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.file-link {
-  color: var(--brand);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.file-link:hover {
-  text-decoration: underline;
-}
-
 /* ---- Comments ---- */
 .comment-thread {
   margin-top: 12px;
@@ -1470,4 +1446,95 @@ a.tag-chip:hover,
   .mapping-remove {
     margin-bottom: 0;
   }
+}
+
+/* ---- Course contributions: reviews and course-level summary files ---- */
+.contribution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.contribution-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 96px;
+  padding: 20px 24px;
+  border: 1px dashed;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.contribution-card strong { font-size: 18px; }
+.contribution-card p { margin: 6px 0 0; color: var(--muted); }
+.contribution-review { border-color: #e65b5b; background: #fffafa; }
+.contribution-review strong { color: #d94b4b; }
+.contribution-file { border-color: #1478d4; background: #f7fbff; }
+.contribution-file strong { color: #0568c8; }
+.contribution-review-button { background: #dc5151; border-color: #dc5151; white-space: nowrap; }
+.contribution-file-button { background: #0872d5; border-color: #0872d5; white-space: nowrap; }
+
+.course-content-tabs {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.course-tab {
+  appearance: none;
+  padding: 14px 4px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.course-tab.active { color: #086cc9; border-bottom-color: #086cc9; }
+.course-see-more { margin-left: auto; white-space: nowrap; }
+.course-tab-panel { display: grid; gap: 14px; padding-top: 24px; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(12, 20, 32, 0.58);
+  overflow-y: auto;
+}
+
+.modal-card { width: min(680px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; }
+.modal-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+.modal-heading h2 { margin-top: 0; }
+.modal-close { border: 0; background: transparent; color: var(--muted); font-size: 30px; line-height: 1; padding: 0 4px; }
+
+.summary-file-list { display: grid; gap: 14px; }
+.summary-file-card { display: grid; gap: 16px; }
+.summary-file-main { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.summary-file-icon { font-size: 32px; }
+.summary-file-name { display: inline-block; color: #0568c8; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.summary-file-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
+.summary-file-uploader { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--muted); font-size: 13px; }
+.summary-file-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.summary-comments { margin-top: 0; }
+.page-heading-row { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+.review-sort-control { min-width: 210px; }
+.summary-year-groups { display: grid; gap: 26px; }
+.summary-year-heading { margin-bottom: 10px; }
+.count-pill { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #eaf4ff; color: #0568c8; font-size: 13px; }
+
+@media (max-width: 700px) {
+  .contribution-grid { grid-template-columns: 1fr; }
+  .contribution-card { padding: 16px; }
+  .course-content-tabs { gap: 10px; flex-wrap: wrap; }
+  .course-tab { font-size: 15px; }
+  .course-see-more { margin-left: 0; }
 }

@@ -92,6 +92,37 @@ def student_import_cleanup(db_conn):
 
 
 @pytest.fixture()
+def summary_file_cleanup(db_conn):
+    """Remove summary-file rows and disk artifacts created by API tests."""
+    yield
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT file_id, stored_path, upload_batch_id FROM summary_files "
+            "WHERE filename LIKE 'summary-test-%'"
+        )
+        rows = cur.fetchall()
+        file_ids = [row[0] for row in rows]
+        batch_ids = list({row[2] for row in rows})
+        for _, stored_path, _ in rows:
+            Path(stored_path).unlink(missing_ok=True)
+        if file_ids:
+            cur.execute(
+                "DELETE FROM audit_logs WHERE action IN "
+                "('UPLOAD_SUMMARY_FILE', 'DELETE_SUMMARY_FILE', 'REPORT_SUMMARY_FILE', "
+                "'MODERATE_SUMMARY_FILE') "
+                "AND target_id = ANY(%s)",
+                (file_ids,),
+            )
+            cur.execute("DELETE FROM summary_files WHERE file_id = ANY(%s)", (file_ids,))
+            cur.execute(
+                "DELETE FROM summary_file_upload_batches "
+                "WHERE upload_batch_id = ANY(%s)",
+                (batch_ids,),
+            )
+    db_conn.commit()
+
+
+@pytest.fixture()
 def valid_review_payload():
     return {
         "course_id": 2,

@@ -69,7 +69,31 @@ export async function apiUpload(path, { file } = {}) {
   return data;
 }
 
-/** Absolute-ish path (still relative to origin) for a file download link. */
-export function fileDownloadUrl(fileId) {
-  return `/api/files/${fileId}/download`;
+/** Multipart upload for a named group of files plus ordinary form fields. */
+export async function apiUploadMany(path, { files = [], fields = {} } = {}) {
+  const formData = new FormData();
+  Object.entries(fields).forEach(([key, value]) => formData.append(key, String(value)));
+  files.forEach((file) => formData.append("files", file));
+
+  const res = await fetch(`/api${path}`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const { detail } = data;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+        ? detail.map((d) => d.msg).join(", ")
+        : `Upload failed (HTTP ${res.status})`;
+    throw new Error(message);
+  }
+  return data;
+}
+
+export function summaryFileDownloadUrl(fileId) {
+  return `/api/summary-files/${fileId}/download`;
 }

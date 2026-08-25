@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, apiUpload } from "./api.js";
+import { api, apiUploadMany } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
 import ReviewCard from "./ReviewCard.jsx";
+import SummaryFileCard from "./components/SummaryFileCard.jsx";
 import {
   RatingForm,
   defaultRatings,
@@ -12,6 +13,8 @@ import {
 } from "./RatingStars.jsx";
 
 const MAX_FILE_MB = 20;
+const MAX_FILES_PER_ROUND = 3;
+const SUMMARY_FILE_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".doc", ".docx", ".ppt", ".pptx"];
 
 /**
  * /course/:id — Course Detail.
@@ -19,7 +22,7 @@ const MAX_FILE_MB = 20;
  * Shows the course header + deep detail fields (FR-4), the instructor(s)
  * teaching it (FR-5), the term/section offerings the university API
  * reports, the ACTIVE reviews (each with rating breakdown, like, comments,
- * files, and owner edit/delete), and the "write a review" form.
+ * and owner edit/delete), plus a separate course-summary-file area.
  *
  * The write-review form is gated by enrollment: a student may only submit a
  * review for a (course, academic_year, semester, section) they were
@@ -35,7 +38,9 @@ export default function CourseDetail() {
 
   const [course, setCourse] = useState(null);
   const [reviews, setReviews] = useState([]);
+  const [summaryFiles, setSummaryFiles] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
+  const [activeTab, setActiveTab] = useState("reviews");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [reportingId, setReportingId] = useState(null);
@@ -47,8 +52,13 @@ export default function CourseDetail() {
     content: "",
     ratings: defaultRatings(),
   });
-  const [reviewFile, setReviewFile] = useState(null);
-  const [reviewFileInputKey, setReviewFileInputKey] = useState(0);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedUploadEnrollmentId, setSelectedUploadEnrollmentId] = useState("");
+  const [selectedSummaryFiles, setSelectedSummaryFiles] = useState([]);
+  const [summaryFileInputKey, setSummaryFileInputKey] = useState(0);
+  const [summaryUploading, setSummaryUploading] = useState(false);
+  const [summaryModalError, setSummaryModalError] = useState("");
 
   const [plans, setPlans] = useState([]);
   const [planAdd, setPlanAdd] = useState({ plan_id: "", academic_year: 2568, semester: "1" });
@@ -68,7 +78,14 @@ export default function CourseDetail() {
     const data = await api(`/courses/${id}/enrollments/me`, { userId: user?.user_id });
     const rows = data.enrollments || [];
     setEnrollments(rows);
-    setSelectedEnrollmentId(rows.length ? String(rows[0].enrollment_id) : "");
+    const reviewable = rows.filter((row) => !row.reviewed);
+    setSelectedEnrollmentId(reviewable.length ? String(reviewable[0].enrollment_id) : "");
+    setSelectedUploadEnrollmentId(rows.length ? String(rows[0].enrollment_id) : "");
+  }
+
+  async function loadSummaryFiles() {
+    const data = await api(`/courses/${id}/summary-files`);
+    setSummaryFiles(data.files || []);
   }
 
   async function loadPlans() {
@@ -82,7 +99,9 @@ export default function CourseDetail() {
     setLoading(true);
     setError("");
     try {
-      await Promise.all([loadCourse(), loadReviews(), loadEnrollments(), loadPlans()]);
+      await Promise.all([
+        loadCourse(), loadReviews(), loadEnrollments(), loadPlans(), loadSummaryFiles(),
+      ]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -133,11 +152,6 @@ export default function CourseDetail() {
       setError("กรุณาเลือกภาคการศึกษาที่คุณลงทะเบียนเรียนวิชานี้");
       return;
     }
-    if (reviewFile && reviewFile.size > MAX_FILE_MB * 1024 * 1024) {
-      setError(`ไฟล์ต้องมีขนาดไม่เกิน ${MAX_FILE_MB}MB`);
-      return;
-    }
-
     setSubmitting(true);
     try {
       const data = await api("/reviews", {
@@ -158,22 +172,9 @@ export default function CourseDetail() {
         },
       });
 
-      let message = `ส่งรีวิวเรียบร้อย (review #${data.review_id})`;
-      if (reviewFile) {
-        try {
-          await apiUpload(`/reviews/${data.review_id}/files`, {
-            file: reviewFile,
-            userId: user.user_id,
-          });
-          message += " พร้อมไฟล์แนบ";
-        } catch (err) {
-          message += ` (แต่แนบไฟล์ไม่สำเร็จ: ${err.message})`;
-        }
-      }
-      setSuccess(message);
+      setSuccess(`ส่งรีวิวเรียบร้อย (review #${data.review_id})`);
       setForm({ content: "", ratings: defaultRatings() });
-      setReviewFile(null);
-      setReviewFileInputKey((k) => k + 1);
+      setReviewModalOpen(false);
       await Promise.all([loadReviews(), loadEnrollments()]);
     } catch (err) {
       setError(`Submission failed: ${err.message}`);
@@ -217,6 +218,55 @@ export default function CourseDetail() {
     );
     setSuccess(`แก้ไขรีวิว #${reviewId} แล้ว`);
   }
+
+  function selectSummaryFiles(event) {
+    const files = Array.from(event.target.files || []);
+    setSummaryModalError("");
+    if (files.length > MAX_FILES_PER_ROUND) {
+      setSummaryModalError(`หนึ่งรอบเลือกได้สูงสุด ${MAX_FILES_PER_ROUND} ไฟล์`);
+      setSelectedSummaryFiles([]);
+      setSummaryFileInputKey((key) => key + 1);
+      return;
+    }
+    const invalid = files.find((file) => {
+      const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
+      return !SUMMARY_FILE_EXTENSIONS.includes(extension) || file.size > MAX_FILE_MB * 1024 * 1024;
+    });
+    if (invalid) {
+      setSummaryModalError(`ไฟล์ ${invalid.name} ไม่รองรับหรือมีขนาดเกิน ${MAX_FILE_MB}MB`);
+      setSelectedSummaryFiles([]);
+      setSummaryFileInputKey((key) => key + 1);
+      return;
+    }
+    setSelectedSummaryFiles(files);
+  }
+
+  async function handleSummaryUpload(event) {
+    event.preventDefault();
+    if (!selectedUploadEnrollmentId || !selectedSummaryFiles.length) return;
+    setSummaryUploading(true);
+    setSummaryModalError("");
+    try {
+      const result = await apiUploadMany(`/courses/${id}/summary-files`, {
+        files: selectedSummaryFiles,
+        fields: { enrollment_id: selectedUploadEnrollmentId },
+      });
+      setSuccess(
+        `อัปโหลด ${result.created_count} ไฟล์แล้ว · เหลือ ${result.remaining_upload_rounds} รอบสำหรับเทอมนี้`
+      );
+      setSelectedSummaryFiles([]);
+      setSummaryFileInputKey((key) => key + 1);
+      setUploadModalOpen(false);
+      setActiveTab("files");
+      await loadSummaryFiles();
+    } catch (err) {
+      setSummaryModalError(err.message);
+    } finally {
+      setSummaryUploading(false);
+    }
+  }
+
+  const reviewableEnrollments = enrollments.filter((row) => !row.reviewed);
 
   if (loading) return <p className="muted">Loading…</p>;
 
@@ -389,96 +439,179 @@ export default function CourseDetail() {
         {planMessage && <p className="muted small">{planMessage}</p>}
       </section>
 
-      {/* Reviews */}
       <section>
-        <h2>รีวิว ({reviews.length})</h2>
-        {reviews.length === 0 ? (
-          <p className="muted">ยังไม่มีรีวิว — เป็นคนแรกเลย!</p>
-        ) : (
-          reviews.map((r) => (
-            <ReviewCard
-              key={r.review_id}
-              review={r}
-              user={user}
-              onReport={handleReport}
-              reportingId={reportingId}
-              onDeleted={handleReviewDeleted}
-              onUpdated={handleReviewUpdated}
-            />
-          ))
-        )}
-      </section>
-
-      {/* Write a review — gated by enrollment (FR: only enrolled students
-          may review a course) */}
-      <section>
-        <h2>เขียนรีวิว</h2>
-        {enrollments.length === 0 ? (
-          <div className="card empty-state">
-            <strong>คุณไม่มีสิทธิ์เขียนรีวิววิชานี้</strong>
-            <p className="muted">
-              ไม่พบข้อมูลว่าคุณเคยลงทะเบียนเรียนวิชานี้ — รีวิวเปิดให้เฉพาะ
-              นักศึกษาที่เคยลงทะเบียนเรียนจริงเท่านั้น
-            </p>
+        <h2>มีส่วนร่วมกับวิชานี้</h2>
+        <div className="contribution-grid">
+          <div className="contribution-card contribution-review">
+            <div>
+              <strong>📝 เขียนรีวิววิชานี้</strong>
+              <p>แชร์ประสบการณ์และให้คะแนน</p>
+            </div>
+            <button
+              type="button"
+              className="btn contribution-review-button"
+              disabled={!reviewableEnrollments.length}
+              onClick={() => setReviewModalOpen(true)}
+            >
+              + รีวิว
+            </button>
           </div>
-        ) : (
-          <form className="card" onSubmit={handleSubmit}>
+          <div className="contribution-card contribution-file">
             <div>
-              <label htmlFor="enrollment">ภาคการศึกษาที่ลงทะเบียนเรียน</label>
-              <select
-                id="enrollment"
-                value={selectedEnrollmentId}
-                onChange={(e) => setSelectedEnrollmentId(e.target.value)}
-              >
-                {enrollments.map((en) => (
-                  <option key={en.enrollment_id} value={en.enrollment_id}>
-                    {en.academic_year} / เทอม {en.semester} / sec {en.section}
-                    {en.reviewed ? " (รีวิวแล้ว)" : ""}
-                  </option>
-                ))}
-              </select>
+              <strong>📤 อัปโหลดไฟล์สรุป</strong>
+              <p>แบ่งปันชีทสรุปหรือไฟล์เรียน</p>
             </div>
-
-            <div>
-              <label htmlFor="content">ความคิดเห็น</label>
-              <textarea
-                id="content"
-                rows={4}
-                placeholder="วิชานี้เป็นอย่างไรบ้าง?"
-                value={form.content}
-                onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))}
-                required
-              />
-            </div>
-
-            <RatingForm
-              ratings={form.ratings}
-              onChange={(ratings) => setForm((prev) => ({ ...prev, ratings }))}
-            />
-
-            <div>
-              <label htmlFor="review-file">
-                แนบไฟล์เอกสารสรุป/ชีทเรียน (ถ้ามี, สูงสุด {MAX_FILE_MB}MB)
-              </label>
-              <input
-                key={reviewFileInputKey}
-                id="review-file"
-                type="file"
-                onChange={(e) => setReviewFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-
-            <div className="form-footer">
-              <span className="meta">
-                กำลังเขียนในนาม <strong>{user.display_name}</strong>
-              </span>
-              <button type="submit" disabled={submitting}>
-                {submitting ? "กำลังส่ง…" : "ส่งรีวิว"}
-              </button>
-            </div>
-          </form>
+            <button
+              type="button"
+              className="btn contribution-file-button"
+              disabled={!enrollments.length}
+              onClick={() => setUploadModalOpen(true)}
+            >
+              + อัปโหลด
+            </button>
+          </div>
+        </div>
+        {!enrollments.length && (
+          <p className="muted small">ต้องมีประวัติว่าเคยเรียนวิชานี้ก่อนจึงจะรีวิวหรืออัปโหลดได้</p>
+        )}
+        {enrollments.length > 0 && !reviewableEnrollments.length && (
+          <p className="muted small">คุณรีวิวทุกภาคการศึกษาที่เคยเรียนแล้ว ลบรีวิวเดิมก่อนหากต้องการเขียนใหม่</p>
         )}
       </section>
+
+      <section>
+        <div className="course-content-tabs">
+          <button
+            type="button"
+            className={activeTab === "reviews" ? "course-tab active" : "course-tab"}
+            onClick={() => setActiveTab("reviews")}
+          >
+            💬 รีวิวทั้งหมด ({reviews.length})
+          </button>
+          <button
+            type="button"
+            className={activeTab === "files" ? "course-tab active" : "course-tab"}
+            onClick={() => setActiveTab("files")}
+          >
+            📁 ไฟล์สรุปทั้งหมด ({summaryFiles.length})
+          </button>
+          <Link
+            className="btn btn-ghost course-see-more"
+            to={activeTab === "reviews" ? `/course/${id}/reviews` : `/course/${id}/summary-files`}
+          >
+            ดูทั้งหมด →
+          </Link>
+        </div>
+
+        {activeTab === "reviews" && (
+          <div className="course-tab-panel">
+            {!reviews.length ? (
+              <div className="card empty-state">ยังไม่มีรีวิวในวิชานี้ — มาเขียนรีวิวแรกเลย!</div>
+            ) : (
+              reviews.slice(0, 3).map((review) => (
+                <ReviewCard
+                  key={review.review_id}
+                  review={review}
+                  user={user}
+                  onReport={handleReport}
+                  reportingId={reportingId}
+                  onDeleted={handleReviewDeleted}
+                  onUpdated={handleReviewUpdated}
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "files" && (
+          <div className="course-tab-panel summary-file-list">
+            {!summaryFiles.length ? (
+              <div className="card empty-state">ยังไม่มีไฟล์สรุปในวิชานี้ — มาแชร์ไฟล์แรกเลย!</div>
+            ) : (
+              summaryFiles.slice(0, 3).map((file) => (
+                <SummaryFileCard
+                  key={file.file_id}
+                  file={file}
+                  user={user}
+                  onRemoved={(fileId) => setSummaryFiles((current) => current.filter((item) => item.file_id !== fileId))}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </section>
+
+      {reviewModalOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setReviewModalOpen(false)}>
+          <div className="card modal-card" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-heading">
+              <div>
+                <h2 id="review-modal-title">เขียนรีวิว {course.course_code}</h2>
+                <p className="muted">เลือกภาคการศึกษาที่เคยเรียนและให้คะแนนให้ครบ</p>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setReviewModalOpen(false)}>×</button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div>
+                <label htmlFor="enrollment">ภาคการศึกษาที่ลงทะเบียนเรียน</label>
+                <select id="enrollment" value={selectedEnrollmentId} onChange={(event) => setSelectedEnrollmentId(event.target.value)}>
+                  {reviewableEnrollments.map((enrollment) => (
+                    <option key={enrollment.enrollment_id} value={enrollment.enrollment_id}>
+                      {enrollment.academic_year} / เทอม {enrollment.semester} / sec {enrollment.section}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="content">ความคิดเห็น</label>
+                <textarea id="content" rows={4} placeholder="วิชานี้เป็นอย่างไรบ้าง?" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} required />
+              </div>
+              <RatingForm ratings={form.ratings} onChange={(ratings) => setForm((current) => ({ ...current, ratings }))} />
+              <div className="form-footer">
+                <button type="button" className="btn btn-ghost" onClick={() => setReviewModalOpen(false)}>ยกเลิก</button>
+                <button type="submit" disabled={submitting}>{submitting ? "กำลังส่ง…" : "ส่งรีวิว"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {uploadModalOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setUploadModalOpen(false)}>
+          <div className="card modal-card" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-heading">
+              <div>
+                <h2 id="upload-modal-title">อัปโหลดไฟล์สรุป {course.course_code}</h2>
+                <p className="muted">หนึ่งรอบได้สูงสุด 3 ไฟล์ และใช้ได้ 2 รอบต่อปี/เทอม</p>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setUploadModalOpen(false)}>×</button>
+            </div>
+            <form onSubmit={handleSummaryUpload}>
+              <div>
+                <label htmlFor="summary-enrollment">ภาคการศึกษาที่เคยเรียน</label>
+                <select id="summary-enrollment" value={selectedUploadEnrollmentId} onChange={(event) => setSelectedUploadEnrollmentId(event.target.value)}>
+                  {enrollments.map((enrollment) => (
+                    <option key={enrollment.enrollment_id} value={enrollment.enrollment_id}>
+                      {enrollment.academic_year} / เทอม {enrollment.semester} / sec {enrollment.section}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="summary-files">เลือกไฟล์ (สูงสุด 3 ไฟล์ต่อรอบ)</label>
+                <input key={summaryFileInputKey} id="summary-files" type="file" multiple accept={SUMMARY_FILE_EXTENSIONS.join(",")} onChange={selectSummaryFiles} required />
+                <p className="muted small">PDF, PNG, JPG, DOC, DOCX, PPT, PPTX · ไม่เกิน 20MB ต่อไฟล์</p>
+                {selectedSummaryFiles.length > 0 && <p className="small">เลือกแล้ว {selectedSummaryFiles.length} ไฟล์</p>}
+              </div>
+              {summaryModalError && <div className="alert alert-error">{summaryModalError}</div>}
+              <div className="form-footer">
+                <button type="button" className="btn btn-ghost" onClick={() => setUploadModalOpen(false)}>ยกเลิก</button>
+                <button type="submit" disabled={summaryUploading || !selectedSummaryFiles.length}>{summaryUploading ? "กำลังอัปโหลด…" : "อัปโหลดไฟล์"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

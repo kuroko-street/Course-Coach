@@ -10,6 +10,7 @@ export default function Admin() {
   const { user } = useAuth();
   const [tab, setTab] = useState("reports");
   const [reviews, setReviews] = useState([]);
+  const [reportedFiles, setReportedFiles] = useState([]);
   const [reportSummary, setReportSummary] = useState({ pending_count: 0, reviewed_count: 0 });
   const [queueOpen, setQueueOpen] = useState(true);
   const [courses, setCourses] = useState([]);
@@ -29,10 +30,10 @@ export default function Admin() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [reportData, summaryData, courseData, curriculumData, instructorData, studentData] = await Promise.all([
-        api("/admin/reports", { userId: user.user_id }), api("/admin/reports/summary", { userId: user.user_id }), api("/admin/courses", { userId: user.user_id }), api("/admin/curriculums", { userId: user.user_id }), api("/admin/instructors", { userId: user.user_id }), api("/admin/students", { userId: user.user_id }),
+      const [reportData, fileData, summaryData, courseData, curriculumData, instructorData, studentData] = await Promise.all([
+        api("/admin/reports", { userId: user.user_id }), api("/admin/summary-files", { userId: user.user_id }), api("/admin/reports/summary", { userId: user.user_id }), api("/admin/courses", { userId: user.user_id }), api("/admin/curriculums", { userId: user.user_id }), api("/admin/instructors", { userId: user.user_id }), api("/admin/students", { userId: user.user_id }),
       ]);
-      setReviews(reportData.reviews || []); setReportSummary(summaryData); setCourses(courseData.courses || []); setCurriculums(curriculumData.curriculums || []); setInstructors(instructorData.instructors || []); setStudents(studentData.students || []);
+      setReviews(reportData.reviews || []); setReportedFiles(fileData.files || []); setReportSummary(summaryData); setCourses(courseData.courses || []); setCurriculums(curriculumData.curriculums || []); setInstructors(instructorData.instructors || []); setStudents(studentData.students || []);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   }, [user.user_id]);
   useEffect(() => { load(); }, [load]);
@@ -41,6 +42,11 @@ export default function Admin() {
   async function handleAction(reviewId, action) {
     setBusyId(`review-${reviewId}`);
     try { const data = await api(`/admin/reviews/${reviewId}/action`, { method: "POST", userId: user.user_id, body: { action } }); flash(`รีวิว #${reviewId}: ${data.message}`); await load(); }
+    catch (err) { setError(err.message); } finally { setBusyId(null); }
+  }
+  async function handleFileAction(fileId, action) {
+    setBusyId(`file-${fileId}`);
+    try { const data = await api(`/admin/summary-files/${fileId}/action`, { method: "POST", userId: user.user_id, body: { action } }); flash(`ไฟล์ #${fileId}: ${data.message}`); await load(); }
     catch (err) { setError(err.message); } finally { setBusyId(null); }
   }
   function startEdit(course) {
@@ -145,10 +151,11 @@ export default function Admin() {
   const setCurriculum = (key) => (value) => setCurriculumForm({ ...curriculumForm, [key]: value });
 
   return <section>
-    <h1>ผู้ดูแลระบบ</h1><p className="muted">ตรวจสอบรีวิว และจัดการข้อมูลรายวิชา/หลักสูตรสำหรับหน้า Catalog</p>
-    <div className="admin-tabs"><button className={tab === "reports" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("reports")}>คิวรีวิว ({reviews.length})</button><button className={tab === "courses" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("courses")}>จัดการรายวิชา</button><button className={tab === "curriculums" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("curriculums")}>หลักสูตร</button><button className={tab === "import" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("import")}>Import วิชา</button><button className={tab === "students" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("students")}>นักศึกษา/สิทธิ์รีวิว</button></div>
+    <h1>ผู้ดูแลระบบ</h1><p className="muted">ตรวจสอบรีวิวและไฟล์ที่ถูกรายงาน รวมถึงจัดการข้อมูลรายวิชา/หลักสูตร</p>
+    <div className="admin-tabs"><button className={tab === "reports" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("reports")}>คิวรีวิว ({reviews.length})</button><button className={tab === "reported-files" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("reported-files")}>คิวไฟล์ ({reportedFiles.length})</button><button className={tab === "courses" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("courses")}>จัดการรายวิชา</button><button className={tab === "curriculums" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("curriculums")}>หลักสูตร</button><button className={tab === "import" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("import")}>Import วิชา</button><button className={tab === "students" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("students")}>นักศึกษา/สิทธิ์รีวิว</button></div>
     {error && <div className="alert alert-error">{error}</div>}{success && <div className="alert alert-success">{success}</div>}
     {tab === "reports" && <Reports loading={loading} reviews={reviews} summary={reportSummary} queueOpen={queueOpen} onToggleQueue={() => setQueueOpen((open) => !open)} busyId={busyId} onAction={handleAction} />}
+    {tab === "reported-files" && <ReportedFiles loading={loading} files={reportedFiles} busyId={busyId} onAction={handleFileAction} />}
     {tab === "courses" && <>
       <h2>{editingId ? `แก้ไขรายวิชา #${editingId}` : "เพิ่มรายวิชา"}</h2>
       <form className="card" onSubmit={saveCourse}>
@@ -205,6 +212,16 @@ function Reports({ loading, reviews, summary, queueOpen, onToggleQueue, busyId, 
       {queueOpen && (!reviews.length ? <div className="card empty-state"><strong>คิวว่าง 🎉</strong><p className="muted">ไม่มีรีวิวที่รอตรวจสอบในขณะนี้</p></div> : <div className="admin-list">{reviews.map((r) => <article className="card admin-card" key={r.review_id}><div className="admin-card-head"><div><span className="badge">{r.course_code}</span><Link to={`/course/${r.course_id}`} className="admin-course">{r.course_name}</Link></div><span className="report-badge">{r.report_count} reports</span></div><blockquote className="admin-quote">{r.content}</blockquote><div className="meta">review #{r.review_id} · โดย {r.reviewer_name} · {r.academic_year}/{r.semester} · sec {r.section}</div><div className="admin-actions"><button className="btn btn-keep" disabled={busyId !== null} onClick={() => onAction(r.review_id, "KEEP")}>{busyId === `review-${r.review_id}` ? "…" : "✓ Keep"}</button><button className="btn btn-delete" disabled={busyId !== null} onClick={() => onAction(r.review_id, "DELETE")}>{busyId === `review-${r.review_id}` ? "…" : "🗑 Delete"}</button></div></article>)}</div>)}
     </section>
   </>;
+}
+function ReportedFiles({ loading, files, busyId, onAction }) {
+  if (loading) return <p className="muted">Loading queue…</p>;
+  if (!files.length) return <div className="card empty-state"><strong>คิวไฟล์ว่าง 🎉</strong><p className="muted">ไม่มีไฟล์ที่รอตรวจสอบในขณะนี้</p></div>;
+  return <div className="admin-list">{files.map((file) => <article className="card admin-card" key={file.file_id}>
+    <div className="admin-card-head"><div><span className="badge">{file.course_code}</span><Link to={`/course/${file.course_id}`} className="admin-course">{file.course_name}</Link></div><span className="report-badge">{file.report_count} reports</span></div>
+    <a className="summary-file-name" href={`/api/admin/summary-files/${file.file_id}/download`} download>{file.filename}</a>
+    <div className="meta">file #{file.file_id} · โดย {file.uploader_name} · {file.academic_year}/{file.semester} · sec {file.section}</div>
+    <div className="admin-actions"><button className="btn btn-keep" disabled={busyId !== null} onClick={() => onAction(file.file_id, "KEEP")}>{busyId === `file-${file.file_id}` ? "…" : "✓ Keep"}</button><button className="btn btn-delete" disabled={busyId !== null} onClick={() => onAction(file.file_id, "DELETE")}>{busyId === `file-${file.file_id}` ? "…" : "🗑 Delete"}</button></div>
+  </article>)}</div>;
 }
 function CourseList({ courses, busyId, onEdit, onToggle }) { return <div className="admin-list">{courses.map((course) => <article className="card course-admin-card" key={course.course_id}><div><span className="badge">{course.course_code}</span><strong>{course.course_name}</strong>{!course.is_active && <span className="status-inactive">ซ่อนจาก Catalog</span>}<div className="meta">{course.department}</div>{course.instructors?.length > 0 && <div className="meta">ผู้สอน: {course.instructors.join(", ")}</div>}{course.curriculum_mappings?.map((m) => <div className="curriculum-chip" key={m.curriculum_id}>{m.curriculum_name} {m.academic_year} · ปี {m.recommended_year} / เทอม {m.recommended_semester} · {m.requirement_type === "REQUIRED" ? "บังคับ" : "เลือก"}</div>)}{course.tags?.map((tag) => <span className="tag-chip tag-chip-static" key={tag}>{tag}</span>)}</div><div className="admin-actions"><button className="btn btn-ghost" onClick={() => onEdit(course)} disabled={busyId !== null}>แก้ไข</button><button className={course.is_active ? "btn btn-danger-outline" : "btn btn-keep"} onClick={() => onToggle(course)} disabled={busyId !== null}>{busyId === `course-${course.course_id}` ? "…" : course.is_active ? "ซ่อนวิชา" : "เปิดใช้"}</button></div></article>)}</div>; }
 function InstructorPicker({ value, options, onChange, onCreate }) {
