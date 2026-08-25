@@ -161,6 +161,8 @@ class ReviewService:
             if user["is_report_blocked"]:
                 raise ServiceError(403, "Your reporting privileges are currently suspended.")
             report_id = self.reviews.add_report(conn, review_id, user["user_id"])
+            if report_id is None:
+                raise ServiceError(409, "You have already reported this review.")
             updated = self.reviews.increment_report_count(conn, review_id, self.REPORT_HIDE_THRESHOLD)
             self.audit.create(conn, user["user_id"], "FLAG_REPORT", review_id, ip_address)
             conn.commit()

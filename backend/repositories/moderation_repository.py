@@ -2,6 +2,18 @@ from db import dict_cursor
 
 
 class ModerationRepository:
+    def summary(self, conn):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'HIDDEN') AS pending_count,
+                    (SELECT COUNT(*) FROM audit_logs WHERE action = 'MODERATE_REVIEW') AS reviewed_count
+                FROM reviews;
+                """
+            )
+            return cur.fetchone()
+
     def list_hidden(self, conn):
         with dict_cursor(conn) as cur:
             cur.execute(

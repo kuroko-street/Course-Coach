@@ -197,7 +197,96 @@ button:disabled,
   background: #c62828;
 }
 
-/* ---- Login / user picker ---- */
+/* ---- Google Workspace login ---- */
+.login-page {
+  min-height: calc(100vh - 150px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 32px 0;
+}
+
+.google-login-card {
+  width: min(100%, 460px);
+  padding: 36px;
+  text-align: center;
+}
+
+.google-login-card h1 {
+  margin-bottom: 8px;
+}
+
+.login-mark {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.login-domain {
+  display: inline-block;
+  margin: 14px 0 22px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.google-button-slot {
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 8px;
+}
+
+.login-privacy {
+  margin: 22px auto 0;
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+.mock-login-card {
+  width: min(100%, 760px);
+  padding: 28px;
+}
+
+.mock-login-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mock-login-heading h2,
+.mock-login-heading p {
+  margin: 0;
+}
+
+.mock-login-heading p {
+  margin-top: 5px;
+}
+
+.mock-login-badge {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #fff3cd;
+  color: #7a5900;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+/* ---- Legacy mock user cards (development only) ---- */
 .user-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -453,6 +542,49 @@ textarea {
 }
 
 /* ---- Admin queue ---- */
+.moderation-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.summary-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fff;
+  display: grid;
+  gap: 3px;
+}
+
+.summary-card span, .summary-card small { color: var(--muted); }
+.summary-card strong { font-size: 28px; line-height: 1; }
+.summary-pending { border-left: 4px solid #e05d55; }
+.summary-pending strong { color: var(--danger); }
+.summary-reviewed { border-left: 4px solid var(--success); }
+.summary-reviewed strong { color: var(--success); }
+
+.review-queue { margin-top: 8px; }
+.queue-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #252525;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.queue-toggle:hover { background: #fafafa; }
+.queue-count { color: var(--brand); font-size: 13px; margin-left: 6px; }
+.queue-chevron { color: var(--muted); font-size: 20px; line-height: 1; }
+.review-queue .admin-list { margin-top: 10px; }
+
 .admin-card-head {
   display: flex;
   align-items: center;
@@ -496,6 +628,127 @@ textarea {
   gap: 8px;
   margin-top: 14px;
 }
+
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  flex-wrap: wrap;
+}
+
+.admin-tab {
+  color: #444;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.admin-tab.active {
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.course-admin-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.status-inactive,
+.curriculum-chip {
+  display: inline-block;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  margin: 8px 6px 0 0;
+}
+
+.status-inactive { background: #fdecea; color: var(--danger); }
+.curriculum-chip { background: var(--brand-soft); color: var(--brand); }
+
+.curriculum-mapping-editor {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fafafa;
+}
+.mapping-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.curriculum-mapping-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr .7fr .7fr auto;
+  align-items: end;
+  gap: 8px;
+  margin-top: 9px;
+}
+.mapping-remove { margin-bottom: 10px; }
+
+.instructor-picker { position: relative; margin-bottom: 10px; }
+.instructor-input-wrap {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+.instructor-input-wrap:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+.instructor-input-wrap input { flex: 1; min-width: 180px; border: 0; outline: 0; padding: 5px 2px; }
+.instructor-chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 8px; background: var(--brand-soft); color: var(--brand); font-size: 13px; }
+.instructor-chip button { border: 0; background: transparent; color: inherit; padding: 0 1px; line-height: 1; cursor: pointer; }
+.instructor-options { position: absolute; z-index: 3; left: 0; right: 0; top: 70px; display: grid; gap: 2px; padding: 5px; border: 1px solid var(--border); border-radius: 7px; background: #fff; box-shadow: 0 8px 20px rgba(0,0,0,.1); }
+.instructor-options button { text-align: left; border: 0; border-radius: 5px; background: transparent; color: #333; padding: 8px 10px; }
+.instructor-options button:hover { background: var(--brand-soft); color: var(--brand); }
+.instructor-no-result { padding: 8px 10px; color: var(--muted); font-size: 13px; }
+.instructor-add-toggle { margin-top: 7px; font-size: 13px; padding: 5px 9px; }
+.instructor-add-form { display: flex; gap: 8px; margin-top: 8px; }
+.instructor-add-form input { flex: 1; }
+.instructor-add-form button { white-space: nowrap; }
+.instructor-picker > small { display: block; margin-top: 6px; }
+
+.import-form { margin-top: 14px; }
+.import-table-wrap { overflow-x: auto; }
+.import-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.import-table th, .import-table td { border-bottom: 1px solid var(--border); padding: 9px 8px; text-align: left; vertical-align: top; }
+.import-table th { color: var(--muted); white-space: nowrap; }
+.import-error { color: var(--danger); font-weight: 600; }
+.import-ok { color: var(--success); font-weight: 600; }
+.import-skip { color: #546e7a; font-weight: 600; }
+.import-update { color: #b26a00; font-weight: 600; }
+.google-linked { color: var(--success); font-size: 12px; font-weight: 700; }
+
+.student-admin-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.student-admin-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.status-linked,
+.status-waiting {
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.status-linked { color: var(--success); background: #e8f5e9; }
+.status-waiting { color: #8a5a00; background: #fff4d6; }
 
 .empty-state {
   text-align: center;
@@ -779,6 +1032,95 @@ a.tag-chip:hover,
 }
 
 /* ---- Dashboard ranking ---- */
+.dashboard-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.dashboard-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.dashboard-summary-card strong {
+  color: var(--brand);
+  font-size: 24px;
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 20px 0 12px;
+}
+
+.dashboard-tabs button {
+  background: #fff;
+  color: #444;
+  border: 1px solid var(--border);
+}
+
+.dashboard-tabs button.dashboard-tab-active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.dashboard-controls {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dashboard-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #555;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dashboard-controls select {
+  min-width: 170px;
+}
+
+.dashboard-ranking-heading {
+  margin-top: 22px;
+}
+
+.dashboard-ranking-heading h2 {
+  margin-bottom: 6px;
+}
+
+.dashboard-empty {
+  color: var(--muted);
+  text-align: center;
+}
+
+.dashboard-refresh-slot {
+  min-height: 22px;
+  padding: 2px 4px;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.ranking-list-refreshing {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .ranking-list {
   display: grid;
   gap: 10px;
@@ -811,7 +1153,7 @@ a.tag-chip:hover,
 
 .ranking-stats {
   display: flex;
-  gap: 18px;
+  gap: 14px;
 }
 
 .ranking-stat {
@@ -819,6 +1161,17 @@ a.tag-chip:hover,
   flex-direction: column;
   align-items: center;
   font-size: 14px;
+}
+
+.ranking-stat-primary {
+  min-width: 82px;
+  padding: 6px 8px;
+  background: var(--brand-soft);
+  border-radius: 6px;
+}
+
+.ranking-stat-primary strong {
+  color: var(--brand);
 }
 
 /* ---- Profile page ---- */
@@ -899,6 +1252,24 @@ a.tag-chip:hover,
 
   .ranking-stats {
     width: 100%;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-controls label,
+  .dashboard-controls select {
+    width: 100%;
+  }
+
+  .curriculum-mapping-row {
+    grid-template-columns: 1fr;
+  }
+
+  .mapping-remove {
+    margin-bottom: 0;
   }
 }

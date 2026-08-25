@@ -10,9 +10,9 @@ export default function NavBar() {
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
-  function handleLogout() {
-    logout();
-    navigate("/login");
+  async function handleLogout() {
+    await logout();
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -45,11 +45,8 @@ export default function NavBar() {
                   {user.role}
                 </span>
               </Link>
-              <Link to="/login" className="btn btn-ghost">
-                Switch user
-              </Link>
               <button type="button" className="btn btn-ghost" onClick={handleLogout}>
-                Log out
+                ออกจากระบบ
               </button>
             </>
           ) : (
