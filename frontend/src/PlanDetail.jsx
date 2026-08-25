@@ -27,14 +27,20 @@ export default function PlanDetail() {
   const { user } = useAuth();
 
   const [plan, setPlan] = useState(null);
-  const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
-  const [addForm, setAddForm] = useState({ course_id: "", academic_year: 2568, semester: "1" });
+  const [departments, setDepartments] = useState([]);
+  const [courseSearch, setCourseSearch] = useState("");
+  const [courseDept, setCourseDept] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+
+  const [addForm, setAddForm] = useState({ academic_year: 2568, semester: "1" });
   const [adding, setAdding] = useState(false);
 
   async function loadPlan() {
@@ -47,11 +53,7 @@ export default function PlanDetail() {
     setLoading(true);
     setError("");
     try {
-      const [, coursesData] = await Promise.all([
-        loadPlan(),
-        api("/courses"),
-      ]);
-      setCourses(coursesData.courses || []);
+      await loadPlan();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -63,6 +65,33 @@ export default function PlanDetail() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Department options for the course picker come from the DB, same as the catalog page.
+  useEffect(() => {
+    api("/departments")
+      .then((data) => setDepartments(data.departments || []))
+      .catch(() => setDepartments([]));
+  }, []);
+
+  // Debounced course search — same search-by-code/name/tag + department filter as the catalog.
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (courseSearch.trim()) params.set("search", courseSearch.trim());
+        if (courseDept) params.set("department", courseDept);
+        const qs = params.toString();
+        const data = await api(`/courses${qs ? `?${qs}` : ""}`);
+        setSearchResults(data.courses || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [courseSearch, courseDept]);
 
   async function handleRename(e) {
     e.preventDefault();
@@ -83,7 +112,7 @@ export default function PlanDetail() {
 
   async function handleAddItem(e) {
     e.preventDefault();
-    if (!addForm.course_id) {
+    if (!selectedCourse) {
       setError("กรุณาเลือกวิชาที่จะเพิ่ม");
       return;
     }
@@ -95,13 +124,14 @@ export default function PlanDetail() {
         method: "POST",
         userId: user.user_id,
         body: {
-          course_id: Number(addForm.course_id),
+          course_id: selectedCourse.course_id,
           academic_year: Number(addForm.academic_year),
           semester: addForm.semester,
         },
       });
       setSuccess("เพิ่มวิชาลงแผนแล้ว");
-      setAddForm((prev) => ({ ...prev, course_id: "" }));
+      setSelectedCourse(null);
+      setCourseSearch("");
       await loadPlan();
     } catch (err) {
       setError(err.message);
@@ -178,47 +208,91 @@ export default function PlanDetail() {
 
       <section>
         <h2>เพิ่มวิชาลงแผน</h2>
-        <form className="card add-item-form" onSubmit={handleAddItem}>
-          <div>
-            <label htmlFor="add-course">วิชา</label>
+        <div className="card course-picker">
+          <div className="filter-bar">
+            <input
+              className="search-bar"
+              type="search"
+              placeholder="ค้นหาด้วยรหัสวิชา, ชื่อวิชา, หรือแท็ก…"
+              value={courseSearch}
+              onChange={(e) => {
+                setCourseSearch(e.target.value);
+                setSelectedCourse(null);
+              }}
+            />
             <select
-              id="add-course"
-              value={addForm.course_id}
-              onChange={(e) => setAddForm((prev) => ({ ...prev, course_id: e.target.value }))}
+              className="department-select"
+              value={courseDept}
+              onChange={(e) => {
+                setCourseDept(e.target.value);
+                setSelectedCourse(null);
+              }}
             >
-              <option value="">-- เลือกวิชา --</option>
-              {courses.map((c) => (
-                <option key={c.course_id} value={c.course_id}>
-                  {c.course_code} — {c.course_name}
+              <option value="">ทุกสาขา</option>
+              {departments.map((d) => (
+                <option key={d} value={d}>
+                  {d}
                 </option>
               ))}
             </select>
           </div>
-          <div>
-            <label htmlFor="add-year">ปีการศึกษา</label>
-            <input
-              id="add-year"
-              type="number"
-              value={addForm.academic_year}
-              onChange={(e) => setAddForm((prev) => ({ ...prev, academic_year: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label htmlFor="add-semester">เทอม</label>
-            <select
-              id="add-semester"
-              value={addForm.semester}
-              onChange={(e) => setAddForm((prev) => ({ ...prev, semester: e.target.value }))}
-            >
-              {SEMESTER_OPTIONS.map((s) => (
-                <option key={s} value={s}>เทอม {s}</option>
+
+          {selectedCourse ? (
+            <div className="selected-course-chip">
+              <span className="badge">{selectedCourse.course_code}</span>
+              <strong>{selectedCourse.course_name}</strong>
+              <button type="button" className="btn-ghost" onClick={() => setSelectedCourse(null)}>
+                เปลี่ยนวิชา
+              </button>
+            </div>
+          ) : searchLoading ? (
+            <p className="muted">กำลังค้นหา…</p>
+          ) : searchResults.length === 0 ? (
+            <p className="muted">ไม่พบรายวิชาที่ตรงกับเงื่อนไข</p>
+          ) : (
+            <div className="course-search-results">
+              {searchResults.map((c) => (
+                <button
+                  type="button"
+                  key={c.course_id}
+                  className="course-search-item"
+                  onClick={() => setSelectedCourse(c)}
+                >
+                  <span className="badge">{c.course_code}</span>
+                  <strong>{c.course_name}</strong>
+                  <span className="muted small"> · {c.department}</span>
+                </button>
               ))}
-            </select>
-          </div>
-          <button type="submit" disabled={adding}>
-            {adding ? "กำลังเพิ่ม…" : "เพิ่ม"}
-          </button>
-        </form>
+            </div>
+          )}
+
+          <form className="add-item-term-form" onSubmit={handleAddItem}>
+            <div>
+              <label htmlFor="add-year">ปีการศึกษา</label>
+              <input
+                id="add-year"
+                type="number"
+                value={addForm.academic_year}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, academic_year: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="add-semester">เทอม</label>
+              <select
+                id="add-semester"
+                value={addForm.semester}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, semester: e.target.value }))}
+              >
+                {SEMESTER_OPTIONS.map((s) => (
+                  <option key={s} value={s}>เทอม {s}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" disabled={adding || !selectedCourse}>
+              {adding ? "กำลังเพิ่ม…" : "เพิ่ม"}
+            </button>
+          </form>
+        </div>
       </section>
 
       <section>

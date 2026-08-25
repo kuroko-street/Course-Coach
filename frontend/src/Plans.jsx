@@ -3,6 +3,19 @@ import { Link } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
 
+/** Smallest positive N such that "แผนN" isn't already taken (reuses gaps left by deleted plans). */
+function nextPlanName(existingPlans) {
+  const used = new Set(
+    existingPlans
+      .map((p) => /^แผน(\d+)$/.exec(p.plan_name))
+      .filter(Boolean)
+      .map((m) => Number(m[1]))
+  );
+  let n = 1;
+  while (used.has(n)) n++;
+  return `แผน${n}`;
+}
+
 /**
  * /plans — list of the current student's own draft study plans (Story 5).
  *
@@ -14,7 +27,6 @@ export default function Plans() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
 
   async function load() {
@@ -35,18 +47,15 @@ export default function Plans() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleCreate(e) {
-    e.preventDefault();
-    if (!newName.trim()) return;
+  async function handleCreate() {
     setCreating(true);
     setError("");
     try {
       await api("/plans", {
         method: "POST",
         userId: user.user_id,
-        body: { plan_name: newName.trim() },
+        body: { plan_name: nextPlanName(plans) },
       });
-      setNewName("");
       await load();
     } catch (err) {
       setError(err.message);
@@ -75,16 +84,11 @@ export default function Plans() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <form className="plan-create-form" onSubmit={handleCreate}>
-        <input
-          placeholder="ตั้งชื่อแผนใหม่ เช่น แผนปี 2 เทอม 1"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-        />
-        <button type="submit" disabled={creating || !newName.trim()}>
-          {creating ? "กำลังสร้าง…" : "สร้างแผน"}
+      <div className="plan-create-form">
+        <button type="button" onClick={handleCreate} disabled={creating}>
+          {creating ? "กำลังสร้าง…" : "+ สร้างแผน"}
         </button>
-      </form>
+      </div>
 
       {loading ? (
         <p className="muted">Loading…</p>
