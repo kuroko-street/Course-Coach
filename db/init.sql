@@ -4,6 +4,10 @@
 -- Engineering rule: fixed-value columns use ENUM, never VARCHAR
 -- ============================================================
 
+-- Trigram matching complements PostgreSQL FTS for partial Thai words and
+-- small typing mistakes (for example คอม -> คอมพิวเตอร์, Computor -> Computer).
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- ----------------------------------------------------------------
 -- ENUM Types (fixed-value domains)
 -- ----------------------------------------------------------------
@@ -11,7 +15,8 @@ CREATE TYPE user_role     AS ENUM ('STUDENT', 'ADMIN');
 CREATE TYPE review_status AS ENUM ('ACTIVE', 'HIDDEN', 'DELETED');
 CREATE TYPE audit_action  AS ENUM (
     'LOGIN', 'WRITE_REVIEW', 'EDIT_REVIEW', 'DELETE_REVIEW',
-    'UPLOAD_FILE', 'FLAG_REPORT', 'MODERATE_REVIEW'
+    'UPLOAD_FILE', 'FLAG_REPORT', 'MODERATE_REVIEW', 'MANAGE_COURSE',
+    'IMPORT_ENROLLMENT'
 );
 
 -- ----------------------------------------------------------------
@@ -21,8 +26,11 @@ CREATE TABLE users (
     user_id            SERIAL PRIMARY KEY,
     username           VARCHAR(100) NOT NULL UNIQUE,
     email              VARCHAR(255) NOT NULL UNIQUE,
+    google_sub         VARCHAR(255) NULL UNIQUE,
+    student_number     VARCHAR(20)  NULL UNIQUE,
     role               user_role    NOT NULL DEFAULT 'STUDENT',
     avatar_url         VARCHAR(500) NULL,
+    is_mock            BOOLEAN      NOT NULL DEFAULT FALSE,
     is_report_blocked  BOOLEAN      NOT NULL DEFAULT FALSE,
     blocked_until      TIMESTAMP    NULL
 );
@@ -41,6 +49,29 @@ CREATE TABLE courses (
     teaching_format  TEXT NULL,
     workload         TEXT NULL,
     assessment       TEXT NULL
+    ,is_active       BOOLEAN      NOT NULL DEFAULT TRUE
+);
+
+-- A course is shared data; its recommended year/term belongs to a particular
+-- curriculum version, not to the course itself.
+CREATE TABLE curriculums (
+    curriculum_id    SERIAL PRIMARY KEY,
+    curriculum_name  VARCHAR(255) NOT NULL,
+    academic_year    INT          NOT NULL,
+    department       VARCHAR(255) NOT NULL,
+    degree_level     VARCHAR(100) NOT NULL DEFAULT 'ปริญญาตรี',
+    is_active        BOOLEAN      NOT NULL DEFAULT TRUE,
+    UNIQUE (curriculum_name, academic_year)
+);
+
+CREATE TABLE curriculum_courses (
+    curriculum_id        INT NOT NULL REFERENCES curriculums(curriculum_id),
+    course_id            INT NOT NULL REFERENCES courses(course_id),
+    recommended_year     SMALLINT NOT NULL CHECK (recommended_year BETWEEN 1 AND 8),
+    recommended_semester VARCHAR(20) NOT NULL,
+    requirement_type     VARCHAR(20) NOT NULL DEFAULT 'REQUIRED'
+                         CHECK (requirement_type IN ('REQUIRED', 'ELECTIVE')),
+    PRIMARY KEY (curriculum_id, course_id)
 );
 
 -- ----------------------------------------------------------------
@@ -122,15 +153,14 @@ CREATE TABLE reviews (
 
 -- ----------------------------------------------------------------
 -- Table: review_reports (Transaction Table)
--- Deliberately NOT unique on (review_id, reporter_id): the demo only ships
--- 3 mock users but the auto-hide threshold is 5 reports, so a single tester
--- must be able to drive a review past the threshold on their own.
+-- One user can report each review only once, preventing report spam.
 -- ----------------------------------------------------------------
 CREATE TABLE review_reports (
     report_id    SERIAL PRIMARY KEY,
     review_id    INT       NOT NULL REFERENCES reviews(review_id),
     reporter_id  INT       NOT NULL REFERENCES users(user_id),
-    reported_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    reported_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (review_id, reporter_id)
 );
 
 -- ----------------------------------------------------------------
@@ -192,6 +222,11 @@ CREATE INDEX idx_review_likes_review   ON review_likes (review_id);
 CREATE INDEX idx_review_comments_review ON review_comments (review_id);
 CREATE INDEX idx_review_files_review   ON review_files (review_id);
 CREATE INDEX idx_courses_search        ON courses (course_code, course_name);
+CREATE INDEX idx_courses_code_trgm      ON courses USING GIN (course_code gin_trgm_ops);
+CREATE INDEX idx_courses_name_trgm      ON courses USING GIN (course_name gin_trgm_ops);
+CREATE INDEX idx_courses_department_trgm ON courses USING GIN (department gin_trgm_ops);
+CREATE INDEX idx_instructors_name_trgm  ON instructors USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_tags_name_trgm         ON tags USING GIN (tag_name gin_trgm_ops);
 CREATE INDEX idx_enrollments_student   ON enrollments (student_id);
 CREATE INDEX idx_enrollments_course    ON enrollments (course_id);
 
@@ -199,13 +234,18 @@ CREATE INDEX idx_enrollments_course    ON enrollments (course_id);
 -- MOCK DATA
 -- ================================================================
 
--- Users (3): two students + one admin
+-- Users: two students, one admin, and three mock reporters.
 -- No avatar_url for mock users: the UI falls back to a generic silhouette
 -- placeholder (see frontend/src/Avatar.jsx) instead of loading photos.
-INSERT INTO users (username, email, role, avatar_url) VALUES
-    ('somchai_s',   'somchai.s@example.ac.th', 'STUDENT', NULL),
-    ('malee_p',     'malee.p@example.ac.th',   'STUDENT', NULL),
-    ('admin_wichai','wichai.a@example.ac.th',  'ADMIN',   NULL);
+INSERT INTO users (username, email, student_number, role, avatar_url, is_mock) VALUES
+    ('somchai_s',   'somchai.s@example.ac.th', '65000001', 'STUDENT', NULL, TRUE),
+    ('malee_p',     'malee.p@example.ac.th',   '65000002', 'STUDENT', NULL, TRUE),
+    ('admin_wichai','wichai.a@example.ac.th',  NULL,       'ADMIN',   NULL, TRUE),
+    -- These background-only accounts make the seeded report count realistic,
+    -- but are intentionally hidden from the development login picker.
+    ('reporter_1',  'reporter1@example.ac.th', NULL, 'STUDENT', NULL, FALSE),
+    ('reporter_2',  'reporter2@example.ac.th', NULL, 'STUDENT', NULL, FALSE),
+    ('reporter_3',  'reporter3@example.ac.th', NULL, 'STUDENT', NULL, FALSE);
 
 -- Courses (3) - all Faculty of Science, spread across departments so the
 -- department filter has something to actually filter. Deep detail fields
@@ -244,6 +284,14 @@ INSERT INTO course_instructors (course_id, instructor_id) VALUES
     (2, 2),
     (3, 3);
 
+INSERT INTO curriculums (curriculum_name, academic_year, department, degree_level) VALUES
+    ('วิทยาการคอมพิวเตอร์', 2569, 'สาขาวิทยาการคอมพิวเตอร์', 'ปริญญาตรี');
+
+INSERT INTO curriculum_courses
+    (curriculum_id, course_id, recommended_year, recommended_semester, requirement_type)
+VALUES
+    (1, 2, 1, '1', 'REQUIRED');
+
 -- Tags (FR-1) + course_tags mapping.
 INSERT INTO tags (tag_name) VALUES
     ('ปี1'), ('พื้นฐาน'), ('เขียนโปรแกรม'), ('คณิต'), ('วิทยาศาสตร์'), ('บังคับ');
@@ -274,14 +322,14 @@ INSERT INTO reviews (course_id, reviewer_id, content, academic_year, semester, s
     (3, 1, 'เนื้อหายากพอสมควรแต่ให้คะแนนตรงไปตรงมา ถ้าทำแบบฝึกหัดครบก็ผ่านสบาย',        2567, '2', '001', 3, 4, 4, 4, 3, 4, 1, 'ACTIVE'),
     (2, 2, 'วิชานี้ห่วยมาก อาจารย์สอนไม่รู้เรื่อง [เนื้อหาไม่เหมาะสม - ถูกรายงาน]',      2566, '1', '001', 1, 5, 5, 1, 1, 1, 5, 'HIDDEN');
 
--- Review Reports - 5 reports against the HIDDEN review (review_id = 4),
+-- Review Reports - 5 distinct users against the HIDDEN review (review_id = 4),
 -- matching its report_count of 5.
 INSERT INTO review_reports (review_id, reporter_id) VALUES
     (4, 1),
-    (4, 1),
     (4, 3),
-    (4, 3),
-    (4, 1);
+    (4, 4),
+    (4, 5),
+    (4, 6);
 
 -- A few likes and a comment so the interaction UI has something to show.
 INSERT INTO review_likes (review_id, user_id) VALUES

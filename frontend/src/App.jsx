@@ -12,16 +12,18 @@ import PlanDetail from "./PlanDetail.jsx";
 
 /** Redirect to /login when nobody is signed in. */
 function RequireAuth({ children }) {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const location = useLocation();
+  if (!authReady) return <p className="muted">กำลังตรวจสอบการเข้าสู่ระบบ…</p>;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   return children;
 }
 
 /** As above, and additionally requires the ADMIN role. */
 function RequireAdmin({ children }) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, authReady } = useAuth();
   const location = useLocation();
+  if (!authReady) return <p className="muted">กำลังตรวจสอบการเข้าสู่ระบบ…</p>;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   if (!isAdmin) {
     return (

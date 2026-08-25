@@ -5,9 +5,11 @@ live in ``services``, and SQL lives in ``repositories``.  This module only
 assembles the application and exposes the health check.
 """
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from api.admin_routes import router as admin_router
 from api.course_routes import router as course_router
@@ -24,8 +26,23 @@ logger = logging.getLogger("coursecoach")
 app = FastAPI(title="Course Coach API", version="5.0.0")
 
 app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "coursecoach-local-dev-change-me"),
+    session_cookie="coursecoach_session",
+    max_age=60 * 60 * 12,
+    same_site="lax",
+    https_only=os.getenv("COOKIE_SECURE", "false").casefold() == "true",
+)
+
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS", "http://localhost,http://localhost:3000"
+        ).split(",")
+        if origin.strip()
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
