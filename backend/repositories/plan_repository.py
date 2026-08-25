@@ -106,8 +106,8 @@ class PlanRepository:
                        c.course_code, c.course_name, c.credits,
                        (SELECT ROUND(AVG(r.rating_satisfaction)::numeric, 1) FROM reviews r
                         WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS avg_satisfaction,
-                       (SELECT ROUND(AVG(r.rating_difficulty)::numeric, 1) FROM reviews r
-                        WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS avg_difficulty,
+                       (SELECT ROUND(AVG(r.rating_recommendation)::numeric, 1) FROM reviews r
+                        WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS avg_recommendation,
                        (SELECT ROUND(AVG(r.rating_workload)::numeric, 1) FROM reviews r
                         WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS avg_workload
                 FROM study_plan_items i

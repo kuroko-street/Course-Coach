@@ -116,7 +116,7 @@ export default function ReviewCard({
       semester: editForm.semester.trim(),
       section: editForm.section.trim(),
       rating_satisfaction: editForm.ratings.satisfaction,
-      rating_difficulty: editForm.ratings.difficulty,
+      rating_recommendation: editForm.ratings.recommendation,
       rating_workload: editForm.ratings.workload,
       rating_content: editForm.ratings.content,
       rating_teaching: editForm.ratings.teaching,

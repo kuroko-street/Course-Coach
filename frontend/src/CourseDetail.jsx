@@ -164,7 +164,7 @@ export default function CourseDetail() {
           semester: enrollment.semester,
           section: enrollment.section,
           rating_satisfaction: form.ratings.satisfaction,
-          rating_difficulty: form.ratings.difficulty,
+          rating_recommendation: form.ratings.recommendation,
           rating_workload: form.ratings.workload,
           rating_content: form.ratings.content,
           rating_teaching: form.ratings.teaching,
@@ -292,6 +292,13 @@ export default function CourseDetail() {
         <span className="badge">{course.course_code}</span>
         <h1 className="course-title">{course.course_name}</h1>
         <p className="muted">{course.department}</p>
+        {Number(course.averages?.review_count) > 0 && (
+          <div className="course-primary-rating">
+            <StarDisplay value={Math.round(Number(course.averages.avg_satisfaction) || 0)} />
+            <strong>{course.averages.avg_satisfaction}/5</strong>
+            <span>ความพึงพอใจกับรายวิชานี้ · {course.averages.review_count} รีวิว</span>
+          </div>
+        )}
         {course.tags?.length > 0 && (
           <div className="tag-chips">
             {course.tags.map((t) => (
@@ -336,15 +343,15 @@ export default function CourseDetail() {
       {/* Average rating per aspect, across this course's ACTIVE reviews */}
       {Number(course.averages?.review_count) > 0 && (
         <section>
-          <h2>คะแนนเฉลี่ยจากรีวิว</h2>
-          <div className="card rating-breakdown">
+          <h2>คะแนนเฉลี่ยรายด้าน</h2>
+          <div className="card course-aspect-grid">
             {RATING_FIELDS.map((f) => (
-              <div className="rating-row" key={f}>
-                <span className="rating-label">{RATING_LABELS[f]}</span>
-                <span>
+              <div className="course-aspect-card" key={f}>
+                <strong>{RATING_LABELS[f]}</strong>
+                <div>
                   <StarDisplay value={Math.round(Number(course.averages[`avg_${f}`]) || 0)} />
-                  <span className="muted small"> ({course.averages[`avg_${f}`]})</span>
-                </span>
+                  <span className="course-aspect-value">{course.averages[`avg_${f}`]}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -559,7 +566,7 @@ export default function CourseDetail() {
             <div className="modal-heading">
               <div>
                 <h2 id="review-modal-title">เขียนรีวิว {course.course_code}</h2>
-                <p className="muted">เลือกภาคการศึกษาที่เคยเรียนและให้คะแนนให้ครบ</p>
+                <p className="muted">เลือกภาคการศึกษาที่เคยเรียนและให้คะแนนแต่ละด้านจาก 1–5</p>
               </div>
               <button type="button" className="modal-close" onClick={() => setReviewModalOpen(false)}>×</button>
             </div>

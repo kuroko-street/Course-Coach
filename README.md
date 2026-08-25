@@ -49,7 +49,7 @@ persisted in the `uploads_data` volume, mounted at `/app/uploads` in the
    instructor(s) teaching it with their teaching/grading style, the
    term/section offerings from the (mocked) university registrar API, and
    the `ACTIVE` reviews. Each review shows its six-aspect rating breakdown
-   (satisfaction/difficulty/workload/content/teaching/exam), a like button,
+   (satisfaction/recommendation/workload/content/teaching/exam), a like button,
    and a comment thread. Reviews and summary files are separate resources.
    - The write-review form only shows a term/section you were actually
      **enrolled** in (see `enrollments` below) — if you have zero
@@ -199,7 +199,7 @@ not public data). Admin endpoints require the session user to have the local
   "semester": "1",
   "section": "001",
   "rating_satisfaction": 5,
-  "rating_difficulty": 2,
+  "rating_recommendation": 4,
   "rating_workload": 2,
   "rating_content": 4,
   "rating_teaching": 5,

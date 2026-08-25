@@ -131,7 +131,7 @@ def valid_review_payload():
         "semester": "2",
         "section": "001",
         "rating_satisfaction": 5,
-        "rating_difficulty": 3,
+        "rating_recommendation": 3,
         "rating_workload": 3,
         "rating_content": 5,
         "rating_teaching": 4,

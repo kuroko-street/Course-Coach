@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "./api.js";
-import { RATING_LABELS } from "./RatingStars.jsx";
+import { RATING_SHORT_LABELS } from "./RatingStars.jsx";
 
 const TABS = [
   { id: "reviews", label: "รีวิวมากที่สุด" },
@@ -10,14 +10,14 @@ const TABS = [
 ];
 
 const ASPECTS = [
-  "satisfaction", "teaching", "content", "difficulty", "workload", "exam",
+  "satisfaction", "recommendation", "workload", "content", "teaching", "exam",
 ];
 
 const METRIC_LABELS = {
   reviews: "จำนวนรีวิว",
   likes: "จำนวนถูกใจ",
   comments: "ความคิดเห็น",
-  ...RATING_LABELS,
+  ...RATING_SHORT_LABELS,
 };
 
 function SummaryCard({ value, label }) {
@@ -122,7 +122,7 @@ export default function Dashboard() {
             ด้านคะแนน
             <select value={aspect} onChange={(event) => setAspect(event.target.value)}>
               {ASPECTS.map((field) => (
-                <option key={field} value={field}>{RATING_LABELS[field]}</option>
+                <option key={field} value={field}>{RATING_SHORT_LABELS[field]}</option>
               ))}
             </select>
           </label>
@@ -150,9 +150,7 @@ export default function Dashboard() {
       <div className="dashboard-ranking-heading">
         <h2>{TABS.find((tab) => tab.id === activeTab)?.label}</h2>
         <p className="muted small">
-          {["difficulty", "workload", "exam"].includes(metric)
-            ? "คะแนนสูงแสดงระดับที่ผู้รีวิวรับรู้ ไม่ได้หมายถึงคุณภาพดีกว่าหรือแย่กว่า"
-            : `เรียงตาม${METRIC_LABELS[metric]}จากมากไปน้อย`}
+          {`เรียงตาม${METRIC_LABELS[metric]}จากมากไปน้อย`}
         </p>
       </div>
 

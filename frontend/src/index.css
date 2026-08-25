@@ -921,6 +921,130 @@ a.tag-chip:hover,
   color: var(--muted);
 }
 
+/* ---- Six-question Likert review form ---- */
+.likert-form {
+  display: grid;
+  gap: 0;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.likert-scale {
+  display: flex;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin: 14px 0 4px;
+  border-radius: 10px;
+  background: #f5f6f8;
+  color: #4e535b;
+  font-size: 12px;
+}
+
+.likert-question {
+  min-width: 0;
+  margin: 0;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.likert-question legend {
+  width: 100%;
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.likert-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.likert-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 62px;
+  margin: 0;
+  border: 1px solid #d9dde4;
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.likert-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.likert-radio {
+  width: 17px;
+  height: 17px;
+  border: 1px solid #9da5b1;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.likert-option.selected {
+  border-color: #3455d1;
+  background: #f2f5ff;
+  color: #2948bf;
+}
+
+.likert-option.selected .likert-radio {
+  border: 5px solid #3b55bf;
+}
+
+.likert-option:focus-within {
+  outline: 2px solid rgba(52, 85, 209, 0.25);
+  outline-offset: 2px;
+}
+
+.course-primary-rating {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.course-primary-rating strong { font-size: 18px; }
+.course-primary-rating span:last-child { color: var(--muted); font-size: 13px; }
+
+.course-aspect-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.course-aspect-card {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f7f7f8;
+}
+
+.course-aspect-card > strong { font-size: 13px; }
+.course-aspect-value { margin-left: 8px; color: #a86e00; font-weight: 700; }
+
+@media (max-width: 620px) {
+  .likert-options { gap: 5px; }
+  .likert-option { min-height: 54px; }
+  .course-aspect-grid { grid-template-columns: 1fr; }
+}
+
 /* ---- Review card interactions ---- */
 .review-actions {
   display: flex;
