@@ -43,6 +43,13 @@ def login_mock(payload: LoginMock, request: Request):
     return result
 
 
+@router.get("/auth/mock-users")
+def list_mock_users():
+    if not mock_login_enabled():
+        raise HTTPException(404, "Mock login is disabled.")
+    return invoke(service.list_mock_users)
+
+
 @router.get("/auth/config")
 def auth_config():
     return {

@@ -19,12 +19,19 @@ class UserService:
         finally:
             conn.close()
 
+    def list_mock_users(self):
+        conn = self.connection_factory()
+        try:
+            return {"users": self.users.list_mock_users(conn)}
+        finally:
+            conn.close()
+
     def login_mock(self, user_id, ip_address=None):
         conn = self.connection_factory()
         try:
-            user = self.users.find_by_id(conn, user_id)
+            user = self.users.find_mock_by_id(conn, user_id)
             if user is None:
-                raise ServiceError(404, f"User id {user_id} not found.")
+                raise ServiceError(404, f"Mock user id {user_id} not found.")
             self.audit.create(conn, user_id, "LOGIN", user_id, ip_address)
             conn.commit()
             return {"user": user, "message": f"Logged in as {user['username']}."}

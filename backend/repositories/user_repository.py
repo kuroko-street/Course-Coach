@@ -13,6 +13,19 @@ class UserRepository:
             )
             return cur.fetchall()
 
+    def list_mock_users(self, conn):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT user_id, username, email, role, avatar_url,
+                       is_report_blocked, blocked_until
+                FROM users
+                WHERE is_mock = TRUE
+                ORDER BY user_id;
+                """
+            )
+            return cur.fetchall()
+
     def find_by_id(self, conn, user_id):
         with dict_cursor(conn) as cur:
             cur.execute(
@@ -72,6 +85,19 @@ class UserRepository:
                 VALUES (%s, %s, 'STUDENT', %s, %s) RETURNING {fields};
                 """,
                 (username, email, avatar_url, google_sub),
+            )
+            return cur.fetchone()
+
+    def find_mock_by_id(self, conn, user_id):
+        with dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT user_id, username, email, role, avatar_url,
+                       is_report_blocked, blocked_until
+                FROM users
+                WHERE user_id = %s AND is_mock = TRUE;
+                """,
+                (user_id,),
             )
             return cur.fetchone()
 

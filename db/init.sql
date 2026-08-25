@@ -28,6 +28,7 @@ CREATE TABLE users (
     google_sub         VARCHAR(255) NULL UNIQUE,
     role               user_role    NOT NULL DEFAULT 'STUDENT',
     avatar_url         VARCHAR(500) NULL,
+    is_mock            BOOLEAN      NOT NULL DEFAULT FALSE,
     is_report_blocked  BOOLEAN      NOT NULL DEFAULT FALSE,
     blocked_until      TIMESTAMP    NULL
 );
@@ -212,10 +213,10 @@ CREATE INDEX idx_enrollments_course    ON enrollments (course_id);
 -- Users (3): two students + one admin
 -- No avatar_url for mock users: the UI falls back to a generic silhouette
 -- placeholder (see frontend/src/Avatar.jsx) instead of loading photos.
-INSERT INTO users (username, email, role, avatar_url) VALUES
-    ('somchai_s',   'somchai.s@example.ac.th', 'STUDENT', NULL),
-    ('malee_p',     'malee.p@example.ac.th',   'STUDENT', NULL),
-    ('admin_wichai','wichai.a@example.ac.th',  'ADMIN',   NULL);
+INSERT INTO users (username, email, role, avatar_url, is_mock) VALUES
+    ('somchai_s',   'somchai.s@example.ac.th', 'STUDENT', NULL, TRUE),
+    ('malee_p',     'malee.p@example.ac.th',   'STUDENT', NULL, TRUE),
+    ('admin_wichai','wichai.a@example.ac.th',  'ADMIN',   NULL, TRUE);
 
 -- Courses (3) - all Faculty of Science, spread across departments so the
 -- department filter has something to actually filter. Deep detail fields

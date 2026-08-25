@@ -61,7 +61,7 @@ export default function Login() {
       .then(async (nextConfig) => {
         setConfig(nextConfig);
         if (nextConfig.mock_login_enabled) {
-          const data = await api("/users");
+          const data = await api("/auth/mock-users");
           setMockUsers(data.users);
         }
       })
