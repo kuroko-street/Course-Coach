@@ -3,24 +3,20 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
 
-const SEMESTER_OPTIONS = ["1", "2", "3"];
+const SEMESTER_OPTIONS = ["1", "2", "summer"];
 
 const WARNING_LABELS = {
-  OVER_CREDIT_CAP: "เกินเกณฑ์หน่วยกิตสูงสุด",
-  UNDER_CREDIT_MIN: "ต่ำกว่าเกณฑ์หน่วยกิตขั้นต่ำ",
-  HEAVY_TERM: "เทอมนี้มีวิชาภาระงานหนักหลายวิชา",
+  DUPLICATE_CODE: "รหัสซ้ำ — รวมหน่วยกิตเพียงครั้งเดียว",
+  INACTIVE_COURSE: "มีรายการที่ปิดแสดง",
 };
 
 /**
  * /plans/:id — a single draft study plan: courses grouped by
  * academic_year/semester, each term showing its running credit total and
- * soft warnings (over/under credit-cap, heavy-workload term), and each
- * course flagging an unmet prerequisite (Story 2/3/4).
- *
- * All validation here is advisory, not blocking — `PlanService` never
- * rejects an add/move because of it, it just recomputes the warnings on the
- * next GET. So every mutating action below simply calls `load()` again
- * afterward instead of patching local state by hand.
+ * warnings for duplicate course codes and inactive source listings.
+ * Source listing terms are separate from the user's planned terms.
+ * There are no enrollment, prerequisite, or workload-policy checks.
+ * Reload totals after each write so the server remains authoritative.
  */
 export default function PlanDetail() {
   const { id } = useParams();
@@ -40,7 +36,7 @@ export default function PlanDetail() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
 
-  const [addForm, setAddForm] = useState({ academic_year: 2568, semester: "1" });
+  const [addForm, setAddForm] = useState({ academic_year: new Date().getFullYear()+543, semester: "1" });
   const [adding, setAdding] = useState(false);
 
   async function loadPlan() {
@@ -75,6 +71,7 @@ export default function PlanDetail() {
 
   // Debounced course search — same search-by-code/name/tag + department filter as the catalog.
   useEffect(() => {
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       setSearchLoading(true);
       try {
@@ -82,15 +79,15 @@ export default function PlanDetail() {
         if (courseSearch.trim()) params.set("search", courseSearch.trim());
         if (courseDept) params.set("department", courseDept);
         const qs = params.toString();
-        const data = await api(`/courses${qs ? `?${qs}` : ""}`);
+        const data = await api(`/courses${qs ? `?${qs}` : ""}`, {signal:controller.signal});
         setSearchResults(data.courses || []);
       } catch (err) {
-        setError(err.message);
+        if (err.name !== 'AbortError') setError(err.message);
       } finally {
-        setSearchLoading(false);
+        if (!controller.signal.aborted) setSearchLoading(false);
       }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {clearTimeout(timer);controller.abort();};
   }, [courseSearch, courseDept]);
 
   async function handleRename(e) {
@@ -208,6 +205,7 @@ export default function PlanDetail() {
 
       <section>
         <h2>เพิ่มวิชาลงแผน</h2>
+        <p className="cc-info">แผนส่วนตัวเท่านั้น ปี/เทอมเป้าหมายด้านล่างแยกจากปี/เทอมของรายการที่ใช้อ้างอิง ไม่ตรวจสิทธิ์ลงทะเบียน วิชาที่เคยผ่าน หรือรับรองว่ามีการเปิดสอนจริง</p>
         <div className="card course-picker">
           <div className="filter-bar">
             <input
@@ -241,6 +239,7 @@ export default function PlanDetail() {
             <div className="selected-course-chip">
               <span className="badge">{selectedCourse.course_code}</span>
               <strong>{selectedCourse.course_name}</strong>
+              <span>อ้างอิง {selectedCourse.academic_year}/{selectedCourse.semester} · {(selectedCourse.instructors || []).map(i=>i.name).join(', ')}</span>
               <button type="button" className="btn-ghost" onClick={() => setSelectedCourse(null)}>
                 เปลี่ยนวิชา
               </button>
@@ -261,6 +260,7 @@ export default function PlanDetail() {
                   <span className="badge">{c.course_code}</span>
                   <strong>{c.course_name}</strong>
                   <span className="muted small"> · {c.department}</span>
+                  <span className="muted small"> · อ้างอิง {c.academic_year}/{c.semester} · {(c.instructors || []).map(i=>i.name).join(', ')}</span>
                 </button>
               ))}
             </div>
@@ -268,7 +268,7 @@ export default function PlanDetail() {
 
           <form className="add-item-term-form" onSubmit={handleAddItem}>
             <div>
-              <label htmlFor="add-year">ปีการศึกษา</label>
+              <label htmlFor="add-year">ปีการศึกษาเป้าหมาย</label>
               <input
                 id="add-year"
                 type="number"
@@ -277,14 +277,14 @@ export default function PlanDetail() {
               />
             </div>
             <div>
-              <label htmlFor="add-semester">เทอม</label>
+              <label htmlFor="add-semester">เทอมเป้าหมาย</label>
               <select
                 id="add-semester"
                 value={addForm.semester}
                 onChange={(e) => setAddForm((prev) => ({ ...prev, semester: e.target.value }))}
               >
                 {SEMESTER_OPTIONS.map((s) => (
-                  <option key={s} value={s}>เทอม {s}</option>
+                  <option key={s} value={s}>{s==='summer'?'ภาคฤดูร้อน':`เทอม ${s}`}</option>
                 ))}
               </select>
             </div>
@@ -304,7 +304,7 @@ export default function PlanDetail() {
             <div key={`${term.academic_year}-${term.semester}`} className="term-block">
               <div className="term-header">
                 <span className="term-title">
-                  ปีการศึกษา {term.academic_year} / เทอม {term.semester}
+                  ปีเป้าหมาย {term.academic_year} / {term.semester==='summer'?'ภาคฤดูร้อน':`เทอม ${term.semester}`}
                 </span>
                 <span className="term-credits">{term.total_credits} หน่วยกิต</span>
               </div>
@@ -313,7 +313,7 @@ export default function PlanDetail() {
                 <div className="term-warnings">
                   {term.warnings.map((w) => (
                     <span key={w.code} className="warning-badge" title={w.message}>
-                      {WARNING_LABELS[w.code] || w.code}
+                      {w.message}
                     </span>
                   ))}
                 </div>
@@ -327,13 +327,7 @@ export default function PlanDetail() {
                     </Link>
                     <strong>{item.course_name}</strong>
                     <span className="muted small"> · {item.credits} หน่วยกิต</span>
-                    {item.prerequisite_unmet && (
-                      <div>
-                        <span className="warning-badge prereq-badge">
-                          ต้องผ่าน {item.missing_prerequisites.map((p) => p.course_code).join(", ")} ก่อน
-                        </span>
-                      </div>
-                    )}
+                    <div className="muted small">รายการอ้างอิง {item.source_academic_year}/{item.source_semester} · {item.instructor_names}</div>
                     <div className="plan-item-ratings">
                       {item.avg_satisfaction != null
                         ? `พึงพอใจ ${item.avg_satisfaction} · แนะนำ ${item.avg_recommendation ?? "–"} · งานเหมาะสม ${item.avg_workload ?? "–"}`
@@ -355,7 +349,7 @@ export default function PlanDetail() {
                       onChange={(e) => handleMoveItem(item.item_id, item.academic_year, e.target.value)}
                     >
                       {SEMESTER_OPTIONS.map((s) => (
-                        <option key={s} value={s}>เทอม {s}</option>
+                        <option key={s} value={s}>{s==='summer'?'ภาคฤดูร้อน':`เทอม ${s}`}</option>
                       ))}
                     </select>
                     <button

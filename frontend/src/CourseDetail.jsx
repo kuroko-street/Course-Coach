@@ -1,649 +1,76 @@
-import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { api, apiUploadMany } from "./api.js";
-import { useAuth } from "./AuthContext.jsx";
-import ReviewCard from "./ReviewCard.jsx";
-import SummaryFileCard from "./components/SummaryFileCard.jsx";
-import {
-  RatingForm,
-  defaultRatings,
-  RATING_FIELDS,
-  RATING_LABELS,
-  StarDisplay,
-} from "./RatingStars.jsx";
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {Link,useLocation,useNavigate,useParams,useSearchParams} from 'react-router-dom';
+import {api} from './api.js';
+import {useAuth} from './AuthContext.jsx';
+import {RATING_FIELDS,RATING_LABELS,RATING_SHORT_LABELS} from './RatingStars.jsx';
+import ReviewCard from './ReviewCard.jsx';
+import SummaryFileCard from './components/SummaryFileCard.jsx';
+import ReviewEditor from './components/ReviewEditor.jsx';
+import UploadDialog from './components/UploadDialog.jsx';
+import {loginPath,semesterLabel} from './components/CourseUI.jsx';
+import {FileQuota,permissionDate,useContributionStatus} from './components/ContributionStatus.jsx';
+import {catalogReturnPath} from './lib/catalogQuery.js';
 
-const MAX_FILE_MB = 20;
-const MAX_FILES_PER_ROUND = 3;
-const SUMMARY_FILE_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".doc", ".docx", ".ppt", ".pptx"];
-
-/**
- * /course/:id — Course Detail.
- *
- * Shows the course header + deep detail fields (FR-4), the instructor(s)
- * teaching it (FR-5), the term/section offerings the university API
- * reports, the ACTIVE reviews (each with rating breakdown, like, comments,
- * and owner edit/delete), plus a separate course-summary-file area.
- *
- * The write-review form is gated by enrollment: a student may only submit a
- * review for a (course, academic_year, semester, section) they were
- * actually enrolled in (`GET /courses/:id/enrollments/me`). If they have no
- * enrollment for this course at all, the form is replaced with a notice
- * instead of a dropdown of terms — the backend enforces the same rule on
- * `POST /api/reviews`, this is just so the student isn't left guessing why
- * a submission got rejected.
- */
-export default function CourseDetail() {
-  const { id } = useParams();
-  const { user } = useAuth();
-
-  const [course, setCourse] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [summaryFiles, setSummaryFiles] = useState([]);
-  const [enrollments, setEnrollments] = useState([]);
-  const [activeTab, setActiveTab] = useState("reviews");
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [reportingId, setReportingId] = useState(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState("");
-  const [form, setForm] = useState({
-    content: "",
-    ratings: defaultRatings(),
-  });
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [selectedUploadEnrollmentId, setSelectedUploadEnrollmentId] = useState("");
-  const [selectedSummaryFiles, setSelectedSummaryFiles] = useState([]);
-  const [summaryFileInputKey, setSummaryFileInputKey] = useState(0);
-  const [summaryUploading, setSummaryUploading] = useState(false);
-  const [summaryModalError, setSummaryModalError] = useState("");
-
-  const [plans, setPlans] = useState([]);
-  const [planAdd, setPlanAdd] = useState({ plan_id: "", academic_year: 2568, semester: "1" });
-  const [planAdding, setPlanAdding] = useState(false);
-  const [planMessage, setPlanMessage] = useState("");
-
-  async function loadCourse() {
-    setCourse(await api(`/courses/${id}`));
-  }
-
-  async function loadReviews() {
-    const data = await api(`/courses/${id}/reviews`, { userId: user?.user_id });
-    setReviews(data.reviews || []);
-  }
-
-  async function loadEnrollments() {
-    const data = await api(`/courses/${id}/enrollments/me`, { userId: user?.user_id });
-    const rows = data.enrollments || [];
-    setEnrollments(rows);
-    const reviewable = rows.filter((row) => !row.reviewed);
-    setSelectedEnrollmentId(reviewable.length ? String(reviewable[0].enrollment_id) : "");
-    setSelectedUploadEnrollmentId(rows.length ? String(rows[0].enrollment_id) : "");
-  }
-
-  async function loadSummaryFiles() {
-    const data = await api(`/courses/${id}/summary-files`);
-    setSummaryFiles(data.files || []);
-  }
-
-  async function loadPlans() {
-    const data = await api("/plans", { userId: user?.user_id });
-    const rows = data.plans || [];
-    setPlans(rows);
-    setPlanAdd((prev) => ({ ...prev, plan_id: rows.length ? String(rows[0].plan_id) : "" }));
-  }
-
-  async function loadAll() {
-    setLoading(true);
-    setError("");
-    try {
-      await Promise.all([
-        loadCourse(), loadReviews(), loadEnrollments(), loadPlans(), loadSummaryFiles(),
-      ]);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+export default function CourseDetail({listMode=null}){
+  const {id}=useParams(),{user,authReady}=useAuth(),[params,setParams]=useSearchParams(),navigate=useNavigate(),location=useLocation();
+  const [course,setCourse]=useState(null),[reviews,setReviews]=useState([]),[files,setFiles]=useState([]);
+  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(true),[dialog,setDialog]=useState(null),[retry,setRetry]=useState(0);
+  const routeKey=`${id}:${user?.user_id||''}:${listMode||''}`,currentRoute=useRef(routeKey);currentRoute.current=routeKey;
+  const {state:permissions,error:permissionError,refresh:refreshPermissions}=useContributionStatus(id,user?.user_id);
+  const ownReview=reviews.find(r=>r.review_id===permissions?.review.active_review_id);
+  const from=catalogReturnPath(location.state?.from),path=`/course/${id}`;
+  const tab=listMode|| (params.get('tab')==='files'?'files':'reviews');
+  const sort=['newest','likes','comments'].includes(params.get('sort'))?params.get('sort'):'newest';
+  const load=useCallback(async(message='')=>{
+    try{
+      const [c,r,f]=await Promise.all([api(`/courses/${id}`),api(`/courses/${id}/reviews`),api(`/courses/${id}/summary-files`)]);
+      if(currentRoute.current!==routeKey)return;
+      if(c.redirected_from){navigate(`/course/${c.course_id}${listMode==='files'?'/summary-files':listMode==='reviews'?'/reviews':''}`,{replace:true,state:{from}});return;}
+      setCourse(c);setReviews(r.reviews);setFiles(f.files);setError('');setNotice(message);await refreshPermissions();
+    }catch(e){if(currentRoute.current===routeKey)setError('รายการอาจบันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ: '+e.message);}
+  },[id,routeKey,listMode,from,navigate,refreshPermissions]);
+  useEffect(()=>{
+    const controller=new AbortController();setLoading(true);setCourse(null);setError('');setNotice('');setDialog(null);
+    Promise.all([api(`/courses/${id}`,{signal:controller.signal}),api(`/courses/${id}/reviews`,{signal:controller.signal}),api(`/courses/${id}/summary-files`,{signal:controller.signal})]).then(([c,r,f])=>{
+      if(controller.signal.aborted)return;
+      if(c.redirected_from){navigate(`/course/${c.course_id}${listMode==='files'?'/summary-files':listMode==='reviews'?'/reviews':''}`,{replace:true,state:{from}});return;}
+      setCourse(c);setReviews(r.reviews);setFiles(f.files);
+    }).catch(e=>{if(e.name!=='AbortError')setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return()=>controller.abort();
+  },[id,user?.user_id,listMode,retry]);
+  useEffect(()=>{
+    if(user&&course&&permissions&&params.get('review')==='1'){
+      if(permissions.review.can_create||ownReview)setDialog('review');
+      setParams(prev=>{const next=new URLSearchParams(prev);next.delete('review');return next;},{replace:true,state:location.state});
     }
-  }
-
-  async function handleAddToPlan(e) {
-    e.preventDefault();
-    setPlanMessage("");
-    if (!planAdd.plan_id) {
-      setPlanMessage("กรุณาสร้างแผนการเรียนก่อน (ไปที่เมนู “แผนการเรียน”)");
-      return;
-    }
-    setPlanAdding(true);
-    try {
-      await api(`/plans/${planAdd.plan_id}/items`, {
-        method: "POST",
-        userId: user.user_id,
-        body: {
-          course_id: Number(id),
-          academic_year: Number(planAdd.academic_year),
-          semester: planAdd.semester,
-        },
-      });
-      setPlanMessage("เพิ่มลงแผนการเรียนแล้ว");
-    } catch (err) {
-      setPlanMessage(err.message);
-    } finally {
-      setPlanAdding(false);
-    }
-  }
-
-  useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    const enrollment = enrollments.find(
-      (en) => String(en.enrollment_id) === selectedEnrollmentId
-    );
-    if (!enrollment) {
-      setError("กรุณาเลือกภาคการศึกษาที่คุณลงทะเบียนเรียนวิชานี้");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const data = await api("/reviews", {
-        method: "POST",
-        userId: user.user_id,
-        body: {
-          course_id: Number(id),
-          content: form.content.trim(),
-          academic_year: enrollment.academic_year,
-          semester: enrollment.semester,
-          section: enrollment.section,
-          rating_satisfaction: form.ratings.satisfaction,
-          rating_recommendation: form.ratings.recommendation,
-          rating_workload: form.ratings.workload,
-          rating_content: form.ratings.content,
-          rating_teaching: form.ratings.teaching,
-          rating_exam: form.ratings.exam,
-        },
-      });
-
-      setSuccess(`ส่งรีวิวเรียบร้อย (review #${data.review_id})`);
-      setForm({ content: "", ratings: defaultRatings() });
-      setReviewModalOpen(false);
-      await Promise.all([loadCourse(), loadReviews(), loadEnrollments()]).catch(
-        (refreshError) => setError(`ส่งรีวิวสำเร็จ แต่โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${refreshError.message}`)
-      );
-    } catch (err) {
-      setError(`Submission failed: ${err.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleReport(reviewId) {
-    setError("");
-    setSuccess("");
-    setReportingId(reviewId);
-    try {
-      const data = await api(`/reviews/${reviewId}/report`, {
-        method: "POST",
-        userId: user.user_id,
-      });
-      setSuccess(
-        data.auto_hidden
-          ? `รีวิว #${reviewId} ถูกซ่อนอัตโนมัติ (ถูกรายงานครบ ${data.report_count} ครั้ง) และส่งเข้าคิวผู้ดูแลระบบแล้ว`
-          : `รายงานรีวิว #${reviewId} แล้ว (${data.report_count}/5)`
-      );
-      // A review that just crossed the threshold disappears from this list.
-      await Promise.all([loadCourse(), loadReviews()]).catch(
-        (refreshError) => setError(`รายงานสำเร็จ แต่โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${refreshError.message}`)
-      );
-    } catch (err) {
-      setError(`Report failed: ${err.message}`);
-    } finally {
-      setReportingId(null);
-    }
-  }
-
-  async function handleReviewDeleted(reviewId) {
-    setReviews((prev) => prev.filter((r) => r.review_id !== reviewId));
-    setSuccess(`ลบรีวิว #${reviewId} แล้ว`);
-    try {
-      await Promise.all([loadCourse(), loadEnrollments()]);
-    } catch (err) {
-      setError(`โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${err.message}`);
-    }
-  }
-
-  async function handleReviewUpdated(reviewId, patch) {
-    setReviews((prev) =>
-      prev.map((r) => (r.review_id === reviewId ? { ...r, ...patch } : r))
-    );
-    setSuccess(`แก้ไขรีวิว #${reviewId} แล้ว`);
-    try {
-      await loadCourse();
-    } catch (err) {
-      setError(`โหลดค่าเฉลี่ยใหม่ไม่สำเร็จ: ${err.message}`);
-    }
-  }
-
-  function selectSummaryFiles(event) {
-    const files = Array.from(event.target.files || []);
-    setSummaryModalError("");
-    if (files.length > MAX_FILES_PER_ROUND) {
-      setSummaryModalError(`หนึ่งรอบเลือกได้สูงสุด ${MAX_FILES_PER_ROUND} ไฟล์`);
-      setSelectedSummaryFiles([]);
-      setSummaryFileInputKey((key) => key + 1);
-      return;
-    }
-    const invalid = files.find((file) => {
-      const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
-      return !SUMMARY_FILE_EXTENSIONS.includes(extension) || file.size > MAX_FILE_MB * 1024 * 1024;
-    });
-    if (invalid) {
-      setSummaryModalError(`ไฟล์ ${invalid.name} ไม่รองรับหรือมีขนาดเกิน ${MAX_FILE_MB}MB`);
-      setSelectedSummaryFiles([]);
-      setSummaryFileInputKey((key) => key + 1);
-      return;
-    }
-    setSelectedSummaryFiles(files);
-  }
-
-  async function handleSummaryUpload(event) {
-    event.preventDefault();
-    if (!selectedUploadEnrollmentId || !selectedSummaryFiles.length) return;
-    setSummaryUploading(true);
-    setSummaryModalError("");
-    try {
-      const result = await apiUploadMany(`/courses/${id}/summary-files`, {
-        files: selectedSummaryFiles,
-        fields: { enrollment_id: selectedUploadEnrollmentId },
-      });
-      setSuccess(
-        `อัปโหลด ${result.created_count} ไฟล์แล้ว · เหลือ ${result.remaining_upload_rounds} รอบสำหรับเทอมนี้`
-      );
-      setSelectedSummaryFiles([]);
-      setSummaryFileInputKey((key) => key + 1);
-      setUploadModalOpen(false);
-      setActiveTab("files");
-      await loadSummaryFiles();
-    } catch (err) {
-      setSummaryModalError(err.message);
-    } finally {
-      setSummaryUploading(false);
-    }
-  }
-
-  const reviewableEnrollments = enrollments.filter((row) => !row.reviewed);
-
-  if (loading) return <p className="muted">Loading…</p>;
-
-  if (!course) {
-    return (
-      <section>
-        {error && <div className="alert alert-error">{error}</div>}
-        <Link to="/" className="back-link">
-          ← Back to catalog
-        </Link>
-      </section>
-    );
-  }
-
-  return (
-    <>
-      <Link to="/" className="back-link">
-        ← Back to catalog
-      </Link>
-
-      {/* Course header */}
-      <section>
-        <span className="badge">{course.course_code}</span>
-        <h1 className="course-title">{course.course_name}</h1>
-        <p className="muted">{course.department}</p>
-        {Number(course.averages?.review_count) > 0 && (
-          <div className="course-primary-rating">
-            <StarDisplay value={Math.round(Number(course.averages.avg_satisfaction) || 0)} />
-            <strong>{course.averages.avg_satisfaction}/5</strong>
-            <span>ความพึงพอใจกับรายวิชานี้ · {course.averages.review_count} รีวิว</span>
-          </div>
-        )}
-        {course.tags?.length > 0 && (
-          <div className="tag-chips">
-            {course.tags.map((t) => (
-              <Link key={t.tag_id} to={`/?search=${encodeURIComponent(t.tag_name)}`} className="tag-chip">
-                #{t.tag_name}
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
-
-      {/* Deep course detail (FR-4) */}
-      <section>
-        <h2>รายละเอียดรายวิชา</h2>
-        <div className="card detail-grid">
-          <div>
-            <strong>เงื่อนไขรายวิชา</strong>
-            <p>{course.prerequisites || "ไม่มีข้อมูล"}</p>
-          </div>
-          <div>
-            <strong>เนื้อหาที่เรียน</strong>
-            <p>{course.syllabus || "ไม่มีข้อมูล"}</p>
-          </div>
-          <div>
-            <strong>รูปแบบการสอน</strong>
-            <p>{course.teaching_format || "ไม่มีข้อมูล"}</p>
-          </div>
-          <div>
-            <strong>ภาระงาน</strong>
-            <p>{course.workload || "ไม่มีข้อมูล"}</p>
-          </div>
-          <div>
-            <strong>วิธีการประเมินผล</strong>
-            <p>{course.assessment || "ไม่มีข้อมูล"}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Average rating per aspect, across this course's ACTIVE reviews */}
-      {Number(course.averages?.review_count) > 0 && (
-        <section>
-          <h2>คะแนนเฉลี่ยรายด้าน</h2>
-          <div className="card course-aspect-grid">
-            {RATING_FIELDS.map((f) => (
-              <div className="course-aspect-card" key={f}>
-                <strong>{RATING_LABELS[f]}</strong>
-                <div>
-                  <StarDisplay value={Math.round(Number(course.averages[`avg_${f}`]) || 0)} />
-                  <span className="course-aspect-value">{course.averages[`avg_${f}`]}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Instructors (FR-5) */}
-      {course.instructors?.length > 0 && (
-        <section>
-          <h2>อาจารย์ผู้สอน</h2>
-          <div className="instructor-grid">
-            {course.instructors.map((inst) => (
-              <Link
-                to={`/instructor/${inst.instructor_id}`}
-                className="card instructor-card instructor-card-link"
-                key={inst.instructor_id}
-              >
-                <strong>{inst.name}</strong>
-                {inst.bio && <p className="muted small">{inst.bio}</p>}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Offerings from the (mock) university registrar API */}
-      <section>
-        <h2>ภาคการศึกษาที่เปิดสอน</h2>
-        <p className="muted small">
-          ข้อมูลจำลองจาก API ระบบทะเบียนมหาวิทยาลัย
-        </p>
-        <div className="offering-grid">
-          {course.offerings?.map((o) => (
-            <div className="card offering-card" key={`${o.academic_year}-${o.semester}`}>
-              <strong>
-                ปีการศึกษา {o.academic_year} / เทอม {o.semester}
-              </strong>
-              <div className="meta">Sections: {o.sections.join(", ")}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Add to a study plan (Story: plan credits before real registration) */}
-      <section>
-        <h2>เพิ่มลงแผนการเรียน</h2>
-        {plans.length === 0 ? (
-          <p className="muted">
-            ยังไม่มีแผนการเรียน — ไปสร้างแผนที่เมนู{" "}
-            <Link to="/plans">แผนการเรียน</Link> ก่อน
-          </p>
-        ) : (
-          <form className="card quick-add-plan" onSubmit={handleAddToPlan}>
-            <div>
-              <label htmlFor="plan-select">แผน</label>
-              <select
-                id="plan-select"
-                value={planAdd.plan_id}
-                onChange={(e) => setPlanAdd((prev) => ({ ...prev, plan_id: e.target.value }))}
-              >
-                {plans.map((p) => (
-                  <option key={p.plan_id} value={p.plan_id}>{p.plan_name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="plan-year">ปีการศึกษา</label>
-              <input
-                id="plan-year"
-                type="number"
-                value={planAdd.academic_year}
-                onChange={(e) => setPlanAdd((prev) => ({ ...prev, academic_year: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label htmlFor="plan-semester">เทอม</label>
-              <select
-                id="plan-semester"
-                value={planAdd.semester}
-                onChange={(e) => setPlanAdd((prev) => ({ ...prev, semester: e.target.value }))}
-              >
-                <option value="1">เทอม 1</option>
-                <option value="2">เทอม 2</option>
-                <option value="3">เทอม 3</option>
-              </select>
-            </div>
-            <button type="submit" disabled={planAdding}>
-              {planAdding ? "กำลังเพิ่ม…" : "เพิ่มลงแผน"}
-            </button>
-          </form>
-        )}
-        {planMessage && <p className="muted small">{planMessage}</p>}
-      </section>
-
-      <section>
-        <h2>มีส่วนร่วมกับวิชานี้</h2>
-        <div className="contribution-grid">
-          {reviewableEnrollments.length ? (
-            <div className="contribution-card contribution-review">
-              <div>
-                <strong>📝 เขียนรีวิววิชานี้</strong>
-                <p>แชร์ประสบการณ์และให้คะแนน</p>
-              </div>
-              <button
-                type="button"
-                className="btn contribution-review-button"
-                onClick={() => setReviewModalOpen(true)}
-              >
-                + รีวิว
-              </button>
-            </div>
-          ) : (
-            <div className="contribution-card contribution-unavailable" role="status">
-              <strong>
-                {enrollments.length ? "คุณใช้สิทธิรีวิววิชานี้แล้ว" : "สิทธิรีวิวเฉพาะผู้เคยเรียน"}
-              </strong>
-              <p>
-                {enrollments.length
-                  ? "ลบรีวิวเดิมก่อน หากต้องการเขียนรีวิวใหม่"
-                  : "ไม่พบประวัติการลงทะเบียนเรียนวิชานี้ของคุณ"}
-              </p>
-            </div>
-          )}
-          {enrollments.length ? (
-            <div className="contribution-card contribution-file">
-              <div>
-                <strong>📤 อัปโหลดไฟล์สรุป</strong>
-                <p>แบ่งปันชีทสรุปหรือไฟล์เรียน</p>
-              </div>
-              <button
-                type="button"
-                className="btn contribution-file-button"
-                onClick={() => setUploadModalOpen(true)}
-              >
-                + อัปโหลด
-              </button>
-            </div>
-          ) : (
-            <div className="contribution-card contribution-unavailable" role="status">
-              <strong>สิทธิอัปโหลดเฉพาะผู้เคยเรียน</strong>
-              <p>ไม่พบประวัติการลงทะเบียนเรียนวิชานี้ของคุณ</p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <div className="course-content-tabs">
-          <button
-            type="button"
-            className={activeTab === "reviews" ? "course-tab active" : "course-tab"}
-            onClick={() => setActiveTab("reviews")}
-          >
-            💬 รีวิวทั้งหมด ({reviews.length})
-          </button>
-          <button
-            type="button"
-            className={activeTab === "files" ? "course-tab active" : "course-tab"}
-            onClick={() => setActiveTab("files")}
-          >
-            📁 ไฟล์สรุปทั้งหมด ({summaryFiles.length})
-          </button>
-          <Link
-            className="btn btn-ghost course-see-more"
-            to={activeTab === "reviews" ? `/course/${id}/reviews` : `/course/${id}/summary-files`}
-          >
-            ดูทั้งหมด →
-          </Link>
-        </div>
-
-        {activeTab === "reviews" && (
-          <div className="course-tab-panel">
-            {!reviews.length ? (
-              <div className="card empty-state">ยังไม่มีรีวิวในวิชานี้ — มาเขียนรีวิวแรกเลย!</div>
-            ) : (
-              reviews.slice(0, 3).map((review) => (
-                <ReviewCard
-                  key={review.review_id}
-                  review={review}
-                  user={user}
-                  onReport={handleReport}
-                  reportingId={reportingId}
-                  onDeleted={handleReviewDeleted}
-                  onUpdated={handleReviewUpdated}
-                />
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === "files" && (
-          <div className="course-tab-panel summary-file-list">
-            {!summaryFiles.length ? (
-              <div className="card empty-state">ยังไม่มีไฟล์สรุปในวิชานี้ — มาแชร์ไฟล์แรกเลย!</div>
-            ) : (
-              summaryFiles.slice(0, 3).map((file) => (
-                <SummaryFileCard
-                  key={file.file_id}
-                  file={file}
-                  user={user}
-                  onRemoved={(fileId) => setSummaryFiles((current) => current.filter((item) => item.file_id !== fileId))}
-                />
-              ))
-            )}
-          </div>
-        )}
-      </section>
-
-      {reviewModalOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setReviewModalOpen(false)}>
-          <div className="card modal-card" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-heading">
-              <div>
-                <h2 id="review-modal-title">เขียนรีวิว {course.course_code}</h2>
-                <p className="muted">เลือกภาคการศึกษาที่เคยเรียนและให้คะแนนแต่ละด้านจาก 1–5</p>
-              </div>
-              <button type="button" className="modal-close" onClick={() => setReviewModalOpen(false)}>×</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="enrollment">ภาคการศึกษาที่ลงทะเบียนเรียน</label>
-                <select id="enrollment" value={selectedEnrollmentId} onChange={(event) => setSelectedEnrollmentId(event.target.value)}>
-                  {reviewableEnrollments.map((enrollment) => (
-                    <option key={enrollment.enrollment_id} value={enrollment.enrollment_id}>
-                      {enrollment.academic_year} / เทอม {enrollment.semester} / sec {enrollment.section}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="content">ความคิดเห็น</label>
-                <textarea id="content" rows={4} placeholder="วิชานี้เป็นอย่างไรบ้าง?" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} required />
-              </div>
-              <RatingForm ratings={form.ratings} onChange={(ratings) => setForm((current) => ({ ...current, ratings }))} />
-              <div className="form-footer">
-                <button type="button" className="btn btn-ghost" onClick={() => setReviewModalOpen(false)}>ยกเลิก</button>
-                <button type="submit" disabled={submitting}>{submitting ? "กำลังส่ง…" : "ส่งรีวิว"}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {uploadModalOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setUploadModalOpen(false)}>
-          <div className="card modal-card" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-heading">
-              <div>
-                <h2 id="upload-modal-title">อัปโหลดไฟล์สรุป {course.course_code}</h2>
-                <p className="muted">หนึ่งรอบได้สูงสุด 3 ไฟล์ และใช้ได้ 2 รอบต่อปี/เทอม</p>
-              </div>
-              <button type="button" className="modal-close" onClick={() => setUploadModalOpen(false)}>×</button>
-            </div>
-            <form onSubmit={handleSummaryUpload}>
-              <div>
-                <label htmlFor="summary-enrollment">ภาคการศึกษาที่เคยเรียน</label>
-                <select id="summary-enrollment" value={selectedUploadEnrollmentId} onChange={(event) => setSelectedUploadEnrollmentId(event.target.value)}>
-                  {enrollments.map((enrollment) => (
-                    <option key={enrollment.enrollment_id} value={enrollment.enrollment_id}>
-                      {enrollment.academic_year} / เทอม {enrollment.semester} / sec {enrollment.section}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="summary-files">เลือกไฟล์ (สูงสุด 3 ไฟล์ต่อรอบ)</label>
-                <input key={summaryFileInputKey} id="summary-files" type="file" multiple accept={SUMMARY_FILE_EXTENSIONS.join(",")} onChange={selectSummaryFiles} required />
-                <p className="muted small">PDF, PNG, JPG, DOC, DOCX, PPT, PPTX · ไม่เกิน 20MB ต่อไฟล์</p>
-                {selectedSummaryFiles.length > 0 && <p className="small">เลือกแล้ว {selectedSummaryFiles.length} ไฟล์</p>}
-              </div>
-              {summaryModalError && <div className="alert alert-error">{summaryModalError}</div>}
-              <div className="form-footer">
-                <button type="button" className="btn btn-ghost" onClick={() => setUploadModalOpen(false)}>ยกเลิก</button>
-                <button type="submit" disabled={summaryUploading || !selectedSummaryFiles.length}>{summaryUploading ? "กำลังอัปโหลด…" : "อัปโหลดไฟล์"}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  },[user,course,permissions,ownReview,params]);
+  function selectTab(nextTab){setNotice('');setParams(prev=>{const next=new URLSearchParams(prev);if(nextTab==='files')next.set('tab','files');else next.delete('tab');return next;},{state:location.state});}
+  const ordered=[...reviews].sort((a,b)=>sort==='likes'?(b.like_count-a.like_count||b.review_id-a.review_id):sort==='comments'?(b.comment_count-a.comment_count||b.review_id-a.review_id):b.review_id-a.review_id);
+  const shownReviews=listMode?ordered:ordered.slice(0,3),shownFiles=listMode?files:files.slice(0,3);
+  if(loading)return <p className="ux-loading" role="status">กำลังโหลดรายวิชา…</p>;
+  if(!course)return <section><div className="card ux-empty"><h1>ยังเปิดรายวิชานี้ไม่ได้</h1><p role="alert">{error||'ไม่พบรายวิชา'}</p><div className="cc-actions"><button type="button" onClick={()=>setRetry(x=>x+1)}>ลองใหม่</button><Link className="btn btn-ghost" to={from}>กลับไปรายวิชา</Link></div></div></section>;
+  const canReview=!!permissions&&(permissions.review.can_create||!!ownReview),canUpload=!!permissions&&permissions.files.available>0;
+  const button=tab==='reviews'?
+    !authReady?<button disabled>กำลังตรวจบัญชี…</button>:!user?<Link className="btn" to={loginPath(path+'?review=1')}>เข้าสู่ระบบเพื่อรีวิว</Link>:<button type="button" disabled={!canReview} onClick={()=>setDialog('review')}>{ownReview?'แก้ไขรีวิวของฉัน':permissions?.review.available_at?'พักสิทธิ์เขียนรีวิว':!permissions?'กำลังตรวจสิทธิ์…':'+ เขียนรีวิว'}</button>:
+    !authReady?<button disabled>กำลังตรวจบัญชี…</button>:!user?<Link className="btn" to={loginPath(path+'?tab=files')}>เข้าสู่ระบบเพื่ออัปโหลด</Link>:<button type="button" disabled={!canUpload} onClick={()=>setDialog('upload')}>{!permissions?'กำลังตรวจสิทธิ์…':canUpload?'+ อัปโหลดไฟล์':'ยังไม่มีช่องอัปโหลดว่าง'}</button>;
+  return <section><Link className="back-link" to={listMode?path:from} state={{from}}>← {listMode?'รายละเอียดวิชา':from.startsWith('/dashboard')?'กลับไปอันดับที่เลือกไว้':'กลับไปผลการค้นหา'}</Link>
+    <div className={`ux-course-hero ${listMode?'ux-compact-hero':''}`}><div><span className="ux-card-code">{course.course_code}</span><h1>{course.course_name}</h1><p className="ux-course-subtitle">สจล. · {course.faculty_name} · {course.department}</p><div className="ux-course-meta"><span className="ux-term-pill">ปี {course.academic_year} · {semesterLabel(course.semester)}</span><span>{course.credits} หน่วยกิต</span></div><div className="ux-course-teachers"><span>ผู้สอน</span>{course.instructors.map(t=><Link key={t.instructor_id} to={`/instructor/${t.instructor_id}`}>{t.name}</Link>)}</div></div>
+      <div className="ux-hero-score"><div><strong>{course.avg_satisfaction==null?'—':Number(course.avg_satisfaction).toFixed(2)}</strong>{course.avg_satisfaction!=null&&<small> / 5</small>}</div><div><p>{course.avg_satisfaction==null?'ยังไม่มีคะแนน':'ความพึงพอใจ'}</p><p>{course.review_count} รีวิวที่แสดง</p></div></div>
+    </div>
+    {!listMode&&<div className="ux-course-overview"><div className="card"><h2>คะแนนเฉลี่ยรายด้าน</h2><div className="ux-aspect-list">{RATING_FIELDS.filter(k=>k!=='satisfaction').map(k=><div className="ux-aspect-row" key={k}><span title={RATING_LABELS[k]}>{RATING_SHORT_LABELS[k]}</span><strong>{course[`avg_${k}`]==null?'—':`${Number(course[`avg_${k}`]).toFixed(2)} / 5`}</strong></div>)}</div><p className="ux-community-note">เฉลี่ยแต่ละด้านแยกกัน จากหนึ่งรีวิวที่แสดงต่อบัญชี</p></div>
+      <div className="card"><h2>สิ่งที่ผู้รีวิวพูดถึง</h2>{course.tags.length?<div className="tag-chips">{course.tags.map(t=><span className="tag-chip tag-chip-static" key={t.tag_id}>#{t.tag_name} · {t.review_count} บัญชี</span>)}</div>:<p className="small muted">ยังไม่มีแท็กจากรีวิว</p>}<p className="ux-community-note">เป็นประสบการณ์ของผู้รีวิว ไม่ใช่ข้อมูลรับรองของวิชา</p>
+        {course.syllabus||course.additional_details?<details className="ux-detail-disclosure"><summary>อ่านคำอธิบายและรายละเอียดวิชา</summary>{course.syllabus&&<p className="cc-secondary-content">{course.syllabus}</p>}{course.additional_details&&<p className="cc-secondary-content">{course.additional_details}</p>}</details>:<p className="ux-community-note">ผู้สร้างยังไม่ได้เพิ่มคำอธิบายวิชา</p>}
+      </div></div>}
+    <div className="ux-content-nav"><div className="ux-tabs" aria-label="เนื้อหาในรายวิชา">{listMode?<><Link className={tab==='reviews'?'is-active':''} to={path+'/reviews'} state={{from}}>รีวิว <span>{reviews.length}</span></Link><Link className={tab==='files'?'is-active':''} to={path+'/summary-files'} state={{from}}>ไฟล์เรียน <span>{files.length}</span></Link></>:<><button type="button" aria-pressed={tab==='reviews'} onClick={()=>selectTab('reviews')}>รีวิว <span>{reviews.length}</span></button><button type="button" aria-pressed={tab==='files'} onClick={()=>selectTab('files')}>ไฟล์เรียน <span>{files.length}</span></button></>}</div><div className="ux-content-action">{user&&tab==='files'&&permissions&&<p>อัปได้อีก {permissions.files.available} ไฟล์</p>}{button}</div></div>
+    {notice&&<p role="status" className="alert alert-success">{notice}</p>}
+    {(error||permissionError)&&<div role="alert" className="alert alert-error ux-inline-error"><span>{error||`ตรวจสิทธิ์ไม่สำเร็จ: ${permissionError}`}</span><button className="btn-ghost" type="button" onClick={()=>load()}>โหลดข้อมูลใหม่</button></div>}
+    {user&&tab==='reviews'&&permissions?.review.available_at&&<div className="ux-quota-alert"><strong>พักสิทธิ์เขียนรีวิวในรายการนี้</strong><p>รีวิวถูกซ่อนหลังได้รับรายงานครบ 5 บัญชี เขียนใหม่ได้วันที่ {permissionDate(permissions.review.available_at)} การลบรีวิวระหว่างพักไม่ทำให้คืนสิทธิ์เร็วขึ้น</p></div>}
+    {user&&tab==='files'&&<FileQuota quota={permissions?.files} compact/>}
+    <div className="ux-content-toolbar"><p>{listMode?(tab==='reviews'?'รีวิวทั้งหมดในรายการนี้':'ไฟล์ทั้งหมดในรายการนี้'):(tab==='reviews'?`แสดง ${shownReviews.length} จาก ${reviews.length} รีวิว`:`แสดง ${shownFiles.length} จาก ${files.length} ไฟล์`)}</p>{tab==='reviews'&&reviews.length>1&&<label className="ux-sort">เรียงรีวิว<select value={sort} onChange={e=>setParams(prev=>{const next=new URLSearchParams(prev);next.set('sort',e.target.value);return next;},{state:location.state})}><option value="newest">ใหม่ที่สุด</option><option value="likes">ถูกใจมากที่สุด</option><option value="comments">ความคิดเห็นมากที่สุด</option></select></label>}</div>
+    {tab==='reviews'?(shownReviews.length?shownReviews.map(r=><ReviewCard key={r.review_id} review={r} course={course} onChanged={load}/>):<div className="card ux-empty"><h3>ยังไม่มีรีวิวที่แสดงในรายการนี้</h3><p>แบ่งปันประสบการณ์เพื่อช่วยคนที่กำลังตัดสินใจเลือกเรียน</p></div>):(shownFiles.length?shownFiles.map(f=><SummaryFileCard key={f.file_id} file={f} onChanged={load}/>):<div className="card ux-empty"><h3>ยังไม่มีไฟล์เรียนในรายการนี้</h3><p>แบ่งปันสรุปหรือเอกสารที่คุณมีสิทธิ์เผยแพร่ ผ่านปุ่มอัปโหลดด้านบน</p></div>)}
+    {!listMode&&(tab==='reviews'?reviews.length:files.length)>0&&<div className="ux-more-link"><Link className="btn btn-ghost" to={path+(tab==='files'?'/summary-files':'/reviews')} state={{from}}>{tab==='files'?`ดูไฟล์ทั้งหมด (${files.length})`:`ดูรีวิวทั้งหมด (${reviews.length})`} →</Link></div>}
+    <p className="ux-page-note">ข้อมูลจากผู้ใช้ · ปี เทอม และผู้สอนเป็นบริบทของรายการนี้ ไม่รับรองการเปิดสอนหรือประวัติการเรียน</p>
+    {dialog==='review'&&<ReviewEditor courseId={id} course={course} review={ownReview} onClose={()=>setDialog(null)} onSaved={()=>load('บันทึกรีวิวแล้ว คะแนนและแท็กอัปเดตตามรีวิวล่าสุด')}/>}
+    {dialog==='upload'&&<UploadDialog courseId={id} course={course} quota={permissions?.files} onClose={()=>setDialog(null)} onSaved={()=>load()}/>}
+  </section>;
 }

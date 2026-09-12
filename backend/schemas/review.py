@@ -1,38 +1,34 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated
 
-
-class ReviewCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    course_id: int = Field(..., ge=1)
-    content: str = Field(..., min_length=1)
-    academic_year: int = Field(..., ge=1900, le=2700)
-    semester: str = Field(..., min_length=1, max_length=20)
-    section: str = Field(..., min_length=1, max_length=20)
-    rating_satisfaction: int = Field(..., ge=1, le=5)
-    rating_recommendation: int = Field(..., ge=1, le=5)
-    rating_workload: int = Field(..., ge=1, le=5)
-    rating_content: int = Field(..., ge=1, le=5)
-    rating_teaching: int = Field(..., ge=1, le=5)
-    rating_exam: int = Field(..., ge=1, le=5)
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ReviewUpdate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    """Year, term and teachers belong to the course, not a second review identity."""
 
-    content: str = Field(..., min_length=1)
-    academic_year: int = Field(..., ge=1900, le=2700)
-    semester: str = Field(..., min_length=1, max_length=20)
-    section: str = Field(..., min_length=1, max_length=20)
-    rating_satisfaction: int = Field(..., ge=1, le=5)
-    rating_recommendation: int = Field(..., ge=1, le=5)
-    rating_workload: int = Field(..., ge=1, le=5)
-    rating_content: int = Field(..., ge=1, le=5)
-    rating_teaching: int = Field(..., ge=1, le=5)
-    rating_exam: int = Field(..., ge=1, le=5)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    content: str = Field(..., min_length=1, max_length=10000)
+    rating_satisfaction: int = Field(..., ge=1, le=5, strict=True)
+    rating_recommendation: int = Field(..., ge=1, le=5, strict=True)
+    rating_workload: int = Field(..., ge=1, le=5, strict=True)
+    rating_content: int = Field(..., ge=1, le=5, strict=True)
+    rating_teaching: int = Field(..., ge=1, le=5, strict=True)
+    rating_exam: int = Field(..., ge=1, le=5, strict=True)
+    tag_ids: list[Annotated[int, Field(ge=1, strict=True)]] = Field(default_factory=list, max_length=16)
+
+    @field_validator("tag_ids")
+    @classmethod
+    def unique_tags(cls, values):
+        if len(values) != len(set(values)):
+            raise ValueError("Choose each tag only once.")
+        return values
+
+
+class ReviewCreate(ReviewUpdate):
+    course_id: int = Field(..., ge=1, strict=True)
 
 
 class CommentCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     content: str = Field(..., min_length=1, max_length=2000)

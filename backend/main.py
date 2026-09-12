@@ -28,7 +28,7 @@ app = FastAPI(title="Course Coach API", version="5.0.0")
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SESSION_SECRET", "coursecoach-local-dev-change-me"),
-    session_cookie="coursecoach_session",
+    session_cookie=os.getenv("SESSION_COOKIE_NAME", "coursecoach_session"),
     max_age=60 * 60 * 12,
     same_site="lax",
     https_only=os.getenv("COOKIE_SECURE", "false").casefold() == "true",

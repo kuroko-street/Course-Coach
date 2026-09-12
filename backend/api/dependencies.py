@@ -9,11 +9,29 @@ from repositories.user_repository import UserRepository
 user_repository = UserRepository()
 
 
+def mock_auth_enabled():
+    return (os.getenv("APP_ENV", "production").lower() in {"development", "test"}
+            and os.getenv("ALLOW_MOCK_AUTH", "false").casefold() == "true")
+
+
 def _session_user_id(request: Request, x_user_id: int | None):
     user_id = request.session.get("user_id")
-    allow_mock = os.getenv("ALLOW_MOCK_AUTH", "false").casefold() == "true"
-    if user_id is None and allow_mock:
-        user_id = x_user_id
+    # Turning mock authentication off also revokes existing mock sessions.
+    if user_id is not None and not mock_auth_enabled():
+        conn = get_connection()
+        try:
+            if user_repository.find_mock_by_id(conn, user_id):
+                request.session.clear()
+                return None
+        finally:
+            conn.close()
+    if user_id is None and x_user_id is not None and mock_auth_enabled():
+        conn = get_connection()
+        try:
+            mock = user_repository.find_mock_by_id(conn, x_user_id)
+            user_id = mock["user_id"] if mock else None
+        finally:
+            conn.close()
     return user_id
 
 

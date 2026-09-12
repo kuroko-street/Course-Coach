@@ -1,0 +1,2 @@
+# Migration checksums must stay identical across Windows and Linux checkouts.
+db/community/*.sql text eol=lf

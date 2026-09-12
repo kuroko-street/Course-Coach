@@ -84,10 +84,10 @@ class UserRepository:
 
             cur.execute(
                 f"""
-                INSERT INTO users (username, email, role, avatar_url, google_sub)
-                VALUES (%s, %s, 'STUDENT', %s, %s) RETURNING {fields};
+                INSERT INTO users (username, email, role, avatar_url, google_sub, display_name)
+                VALUES (%s, %s, 'STUDENT', %s, %s, %s) RETURNING {fields};
                 """,
-                (username, email, avatar_url, google_sub),
+                (username, email, avatar_url, google_sub, (display_name or base_username).strip()[:100]),
             )
             return cur.fetchone()
 
@@ -132,7 +132,7 @@ class UserRepository:
         with dict_cursor(conn) as cur:
             cur.execute(
                 f"""
-                SELECT user_id, username, student_number, avatar_url, role, {DISPLAY_NAME_EXPR}
+                SELECT user_id, avatar_url, role, {DISPLAY_NAME_EXPR}
                 FROM users WHERE user_id = %s;
                 """,
                 (user_id,),
@@ -143,7 +143,7 @@ class UserRepository:
             cur.execute(
                 """
                 SELECT r.review_id, r.course_id, r.reviewer_id, r.content,
-                       r.academic_year, r.semester, r.section,
+                       c.academic_year, c.semester,
                        r.rating_satisfaction, r.rating_recommendation, r.rating_workload,
                        r.rating_content, r.rating_teaching, r.rating_exam,
                        r.report_count, r.status, r.created_at, r.edited_at,
@@ -152,6 +152,7 @@ class UserRepository:
                         WHERE rl.review_id = r.review_id) AS like_count
                 FROM reviews r JOIN courses c ON c.course_id = r.course_id
                 WHERE r.reviewer_id = %s AND r.status = 'ACTIVE'
+                  AND c.is_active AND c.merged_into_course_id IS NULL
                 ORDER BY r.created_at DESC;
                 """,
                 (user_id,),
@@ -161,7 +162,9 @@ class UserRepository:
                 """
                 SELECT COUNT(*) AS total_likes FROM review_likes rl
                 JOIN reviews r ON r.review_id = rl.review_id
-                WHERE r.reviewer_id = %s AND r.status = 'ACTIVE';
+                JOIN courses c ON c.course_id = r.course_id
+                WHERE r.reviewer_id = %s AND r.status = 'ACTIVE'
+                  AND c.is_active AND c.merged_into_course_id IS NULL;
                 """,
                 (user_id,),
             )

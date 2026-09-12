@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from auth import GoogleIdentityVerifier
-from api.dependencies import require_user
+from api.dependencies import require_user, require_admin, mock_auth_enabled
 from domain.errors import ServiceError
 from schemas.user import GoogleLogin, LoginMock, UserUpdate
 from services.user_service import UserService
@@ -20,7 +20,7 @@ service = UserService(
 
 
 def mock_login_enabled():
-    return os.getenv("ALLOW_MOCK_AUTH", "false").casefold() == "true"
+    return mock_auth_enabled()
 
 
 def invoke(operation, *args):
@@ -33,7 +33,7 @@ def invoke(operation, *args):
 
 
 @router.get("/users")
-def list_users():
+def list_users(_admin: dict = Depends(require_admin)):
     return invoke(service.list_users)
 
 
@@ -111,8 +111,3 @@ def get_user_avatar(user_id: int):
 @router.get("/users/{user_id}/profile")
 def get_user_profile(user_id: int):
     return invoke(service.profile, user_id)
-
-
-@router.get("/users/{user_id}/enrollments")
-def list_user_enrollments(user_id: int, caller: dict = Depends(require_user)):
-    return invoke(service.enrollments, user_id, caller)

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "./api.js";
 import Avatar from "./Avatar.jsx";
+import { CourseContext } from './components/CourseUI.jsx';
 
 /**
  * /instructor/:id — read-only instructor profile page. Instructors have no
@@ -72,6 +73,7 @@ export default function Instructor() {
                   <span className="badge">{c.course_code}</span>
                   <strong>{c.course_name}</strong>
                   <div className="meta">{c.department}</div>
+                  <CourseContext course={c}/>
                 </div>
               </Link>
             ))}

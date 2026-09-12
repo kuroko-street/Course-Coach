@@ -4,7 +4,7 @@ from db import dict_cursor
 class PlanRepository:
     def course_exists(self, conn, course_id):
         with dict_cursor(conn) as cur:
-            cur.execute("SELECT course_id FROM courses WHERE course_id = %s;", (course_id,))
+            cur.execute("SELECT course_id FROM courses WHERE course_id = %s AND is_active AND merged_into_course_id IS NULL FOR SHARE;", (course_id,))
             return cur.fetchone() is not None
 
     def create(self, conn, student_id, plan_name):
@@ -24,7 +24,11 @@ class PlanRepository:
                 """
                 SELECT p.plan_id, p.plan_name, p.created_at, p.updated_at,
                        COUNT(i.item_id) AS item_count,
-                       COALESCE(SUM(c.credits), 0) AS total_credits
+                       COALESCE((SELECT SUM(x.credits) FROM (
+                           SELECT i2.academic_year,i2.semester,c2.code_normalized,MAX(c2.credits) AS credits
+                           FROM study_plan_items i2 JOIN courses c2 ON c2.course_id=i2.course_id
+                           WHERE i2.plan_id=p.plan_id GROUP BY i2.academic_year,i2.semester,c2.code_normalized
+                       ) x), 0) AS total_credits
                 FROM study_plans p
                 LEFT JOIN study_plan_items i ON i.plan_id = p.plan_id
                 LEFT JOIN courses c ON c.course_id = i.course_id
@@ -39,7 +43,7 @@ class PlanRepository:
     def find_by_id(self, conn, plan_id):
         with dict_cursor(conn) as cur:
             cur.execute(
-                "SELECT plan_id, student_id, plan_name, created_at, updated_at FROM study_plans WHERE plan_id = %s;",
+                "SELECT plan_id, student_id, plan_name, created_at, updated_at FROM study_plans WHERE plan_id = %s FOR UPDATE;",
                 (plan_id,),
             )
             return cur.fetchone()
@@ -60,11 +64,11 @@ class PlanRepository:
             cur.execute("DELETE FROM study_plan_items WHERE plan_id = %s;", (plan_id,))
             cur.execute("DELETE FROM study_plans WHERE plan_id = %s;", (plan_id,))
 
-    def item_exists_for_course(self, conn, plan_id, course_id):
+    def item_exists_for_course(self, conn, plan_id, course_id, academic_year, semester, excluded_id=0):
         with dict_cursor(conn) as cur:
             cur.execute(
-                "SELECT 1 FROM study_plan_items WHERE plan_id = %s AND course_id = %s;",
-                (plan_id, course_id),
+                "SELECT 1 FROM study_plan_items WHERE plan_id = %s AND course_id = %s AND academic_year=%s AND semester=%s AND item_id<>%s;",
+                (plan_id, course_id, academic_year, semester, excluded_id),
             )
             return cur.fetchone() is not None
 
@@ -103,7 +107,9 @@ class PlanRepository:
             cur.execute(
                 """
                 SELECT i.item_id, i.course_id, i.academic_year, i.semester, i.added_at,
-                       c.course_code, c.course_name, c.credits,
+                       c.course_code, c.code_normalized, c.course_name, c.credits,
+                       c.academic_year AS source_academic_year,c.semester AS source_semester,c.is_active,
+                       (SELECT string_agg(ins.name, ', ' ORDER BY ins.name) FROM course_instructors ci JOIN instructors ins USING(instructor_id) WHERE ci.course_id=c.course_id) AS instructor_names,
                        (SELECT ROUND(AVG(r.rating_satisfaction)::numeric, 1) FROM reviews r
                         WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS avg_satisfaction,
                        (SELECT ROUND(AVG(r.rating_recommendation)::numeric, 1) FROM reviews r
