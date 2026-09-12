@@ -1,153 +1,20 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { api, summaryFileDownloadUrl } from "../api.js";
-import Avatar from "../Avatar.jsx";
+import {useState} from 'react';
+import {Link,useLocation} from 'react-router-dom';
+import {api,summaryFileDownloadUrl} from '../api.js';
+import {useAuth} from '../AuthContext.jsx';
+import CommentThread from './CommentThread.jsx';
+import ActionMenu from './ActionMenu.jsx';
+import {ConfirmDialog} from './Modal.jsx';
+import {loginPath} from './CourseUI.jsx';
 
-
-function formatSize(bytes) {
-  const size = Number(bytes) || 0;
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-
-export default function SummaryFileCard({ file, user, showCourse = false, onRemoved }) {
-  const [liked, setLiked] = useState(Boolean(file.user_liked));
-  const [likeCount, setLikeCount] = useState(Number(file.like_count) || 0);
-  const [comments, setComments] = useState(file.comments || []);
-  const [comment, setComment] = useState("");
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const canDelete = user?.role === "ADMIN" || user?.user_id === file.uploader_id;
-
-  async function toggleLike() {
-    setBusy("like");
-    setError("");
-    try {
-      const result = await api(`/summary-files/${file.file_id}/like`, { method: "POST" });
-      setLiked(result.liked);
-      setLikeCount(result.like_count);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function submitComment(event) {
-    event.preventDefault();
-    if (!comment.trim()) return;
-    setBusy("comment");
-    setError("");
-    try {
-      const created = await api(`/summary-files/${file.file_id}/comments`, {
-        method: "POST",
-        body: { content: comment.trim() },
-      });
-      setComments((current) => [...current, created]);
-      setComment("");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function reportFile() {
-    if (!window.confirm("รายงานไฟล์นี้ว่าไม่เหมาะสมใช่หรือไม่?")) return;
-    setBusy("report");
-    setError("");
-    try {
-      const result = await api(`/summary-files/${file.file_id}/report`, { method: "POST" });
-      if (result.auto_hidden) onRemoved?.(file.file_id);
-      else window.alert(`รายงานแล้ว (${result.report_count}/5)`);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function deleteFile() {
-    if (!window.confirm("ลบไฟล์นี้ใช่หรือไม่?")) return;
-    setBusy("delete");
-    setError("");
-    try {
-      await api(`/summary-files/${file.file_id}`, { method: "DELETE" });
-      onRemoved?.(file.file_id);
-    } catch (err) {
-      setError(err.message);
-      setBusy("");
-    }
-  }
-
-  return (
-    <article className="card summary-file-card">
-      <div className="summary-file-main">
-        <div className="summary-file-icon">📄</div>
-        <div>
-          <a className="summary-file-name" href={summaryFileDownloadUrl(file.file_id)} download>
-            {file.filename}
-          </a>
-          <div className="meta summary-file-meta">
-            {showCourse && (
-              <Link to={`/course/${file.course_id}`}>
-                {file.course_code} · {file.course_name}
-              </Link>
-            )}
-            <span>ปี {file.academic_year} / เทอม {file.semester}</span>
-            <span>{formatSize(file.size_bytes)}</span>
-          </div>
-          <div className="summary-file-uploader">
-            <Avatar url={file.uploader_avatar} size={20} />
-            <span>อัปโหลดโดย {file.uploader_name}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="summary-file-actions">
-        <button
-          type="button"
-          className={`btn btn-like ${liked ? "btn-like-active" : ""}`}
-          onClick={toggleLike}
-          disabled={Boolean(busy)}
-        >
-          {liked ? "♥" : "♡"} {likeCount}
-        </button>
-        <button type="button" className="btn btn-danger-outline" onClick={reportFile} disabled={Boolean(busy)}>
-          ⚑ รายงาน
-        </button>
-        {canDelete && (
-          <button type="button" className="btn btn-danger-outline" onClick={deleteFile} disabled={Boolean(busy)}>
-            {busy === "delete" ? "…" : "🗑 ลบ"}
-          </button>
-        )}
-      </div>
-
-      {error && <div className="alert alert-error">{error}</div>}
-      <div className="comment-thread summary-comments">
-        {comments.map((item) => (
-          <div className="comment-row" key={item.comment_id}>
-            <Link to={`/profile/${item.author_id}`} className="comment-author">
-              <Avatar url={item.author_avatar} size={16} />
-              {item.author_name}
-            </Link>
-            <span className="comment-content">{item.content}</span>
-          </div>
-        ))}
-        <form className="comment-form" onSubmit={submitComment}>
-          <input
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            placeholder="แสดงความคิดเห็นเกี่ยวกับไฟล์นี้…"
-            maxLength={2000}
-          />
-          <button type="submit" className="btn btn-ghost" disabled={busy === "comment" || !comment.trim()}>
-            {busy === "comment" ? "…" : "ส่ง"}
-          </button>
-        </form>
-      </div>
-    </article>
-  );
+export default function SummaryFileCard({file:f,onChanged}){
+  const {user}=useAuth(),location=useLocation();
+  const [comments,setComments]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirm,setConfirm]=useState(null);
+  async function action(suffix,method){setBusy(true);setError('');try{await api(`/summary-files/${f.file_id}${suffix}`,{method});setConfirm(null);await onChanged?.();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  return <article className="card ux-review-card"><div className="ux-file-main"><div className="ux-file-info"><span className="ux-file-type" aria-hidden="true">{f.filename.split('.').pop().toUpperCase()}</span><div><h3>{f.filename}</h3><p className="meta">{(Number(f.size_bytes)/1048576).toFixed(2)} MB · {new Date(f.uploaded_at+'Z').toLocaleDateString('th-TH')}</p><p className="meta">แบ่งปันโดย <Link to={`/profile/${f.uploader_id}`}>{f.uploader_name}</Link></p></div></div>{user?<a className="btn" href={summaryFileDownloadUrl(f.file_id)}>ดาวน์โหลด</a>:<Link className="btn" to={loginPath(location.pathname+location.search)}>เข้าสู่ระบบเพื่อดาวน์โหลด</Link>}</div>
+    <div className="ux-card-actions">{user?<button type="button" className="btn-ghost" disabled={busy} aria-pressed={f.liked_by_me} aria-label={`ถูกใจไฟล์ ${f.like_count} ครั้ง`} onClick={()=>action('/like','POST')}>{f.liked_by_me?'♥':'♡'} {f.like_count} ถูกใจ</button>:<Link className="btn btn-ghost" to={loginPath(location.pathname+location.search)}>♡ {f.like_count} ถูกใจ</Link>}<button type="button" className="btn-ghost" aria-expanded={comments} onClick={()=>setComments(!comments)}>ความคิดเห็น ({f.comment_count})</button>
+      {user&&<ActionMenu label={`ตัวเลือกไฟล์ ${f.filename}`}>{user.user_id===f.uploader_id?<button className="ux-danger" type="button" disabled={busy} onClick={()=>{setError('');setConfirm('delete');}}>ลบไฟล์</button>:<button type="button" disabled={busy||f.reported_by_me} onClick={()=>{setError('');setConfirm('report');}}>{f.reported_by_me?'รายงานแล้ว':'รายงานไฟล์'}</button>}</ActionMenu>}
+    </div>{error&&!confirm&&<p role="alert" className="alert alert-error">{error}</p>}{comments&&<CommentThread basePath={`/summary-files/${f.file_id}`} onChanged={onChanged}/>}
+    {confirm&&<ConfirmDialog title={confirm==='delete'?'ลบไฟล์นี้?':'รายงานไฟล์นี้?'} confirmLabel={confirm==='delete'?'ยืนยันลบไฟล์':'ยืนยันรายงาน'} busy={busy} error={error} onClose={()=>setConfirm(null)} onConfirm={()=>action(confirm==='delete'?'':'/report',confirm==='delete'?'DELETE':'POST')}>{confirm==='delete'?`ไฟล์ “${f.filename}” จะไม่แสดงในรายวิชา การลบไฟล์ปกติคืนช่องอัปโหลดให้คุณทันที`:'ใช้เมื่อพบไฟล์ที่ไม่เหมาะสม บัญชีเดิมนับรายงานได้ครั้งเดียว เมื่อครบ 5 บัญชี ระบบจะซ่อนไฟล์อัตโนมัติ'}</ConfirmDialog>}
+  </article>;
 }

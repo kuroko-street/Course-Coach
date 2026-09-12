@@ -22,7 +22,7 @@ def invoke(operation, *args, **kwargs):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Unable to complete this request.") from exc
 
 
 @router.post("/reviews", status_code=201)
@@ -84,3 +84,18 @@ def report_review(
     user: dict = Depends(require_user),
 ):
     return invoke(review_service.report_review, review_id, user, client_ip(request))
+
+
+@router.post("/reviews/{review_id}/comments/{comment_id}/report", status_code=201)
+def report_comment(review_id: int, comment_id: int, request: Request, user: dict = Depends(require_user)):
+    return invoke(review_service.comments.report, review_id, comment_id, user, client_ip(request))
+
+
+@router.put("/reviews/{review_id}/comments/{comment_id}")
+def update_comment(review_id: int, comment_id: int, payload: CommentCreate, user: dict = Depends(require_user)):
+    return invoke(review_service.comments.update, review_id, comment_id, user, payload.content)
+
+
+@router.delete("/reviews/{review_id}/comments/{comment_id}")
+def delete_comment(review_id: int, comment_id: int, user: dict = Depends(require_user)):
+    return invoke(review_service.comments.delete, review_id, comment_id, user)

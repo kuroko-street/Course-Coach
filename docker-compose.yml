@@ -1,86 +1,74 @@
+# LOCAL community redesign. All volumes/names are separate from the legacy stack.
+# Start: docker compose up -d --build
+# Never use down -v to switch versions; see LOCAL-REDESIGN.md.
+name: coursecoach-community
+x-app-env: &app-env
+  DB_HOST: db
+  DB_PORT: 5432
+  DB_NAME: coursecoach_community
+  DB_USER: coursecoach
+  DB_PASSWORD: coursecoach_local_only
+  APP_ENV: development
+  WATCHFILES_FORCE_POLLING: "true"
+  UPLOADS_DIR: /data/uploads
+  AVATARS_DIR: /data/avatars
+  ALLOW_MOCK_AUTH: ${COMMUNITY_MOCK_AUTH:-true}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-610984601873-obcs09oonbadi58tvgkhr1sbr4muiv92.apps.googleusercontent.com}
+  GOOGLE_ALLOWED_DOMAIN: kmitl.ac.th
+  SESSION_SECRET: ${SESSION_SECRET:-community-local-dev-change-before-cloud}
+  SESSION_COOKIE_NAME: coursecoach_community_session
+  COOKIE_SECURE: "false"
+  CORS_ORIGINS: http://localhost,http://localhost:3000
 services:
   db:
     image: postgres:16
-    container_name: coursecoach_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: coursecoach
-      POSTGRES_PASSWORD: coursecoach_pass
-      POSTGRES_DB: coursecoach
-    # Expose PostgreSQL only on this machine so local tools such as DBeaver
-    # can connect without making the database public on the network.
-    ports:
-      - "127.0.0.1:5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      POSTGRES_PASSWORD: coursecoach_local_only
+      POSTGRES_DB: coursecoach_community
+    ports: ["127.0.0.1:5433:5432"]
+    volumes: ["community_db:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U coursecoach -d coursecoach"]
+      test: ["CMD-SHELL", "pg_isready -U coursecoach -d coursecoach_community"]
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 10s
-
+      retries: 20
+  migrate:
+    build: ./backend
+    environment: *app-env
+    volumes: ["./db/community:/migrations:ro"]
+    command: ["python", "migrate.py"]
+    depends_on:
+      db: {condition: service_healthy}
   backend:
     build: ./backend
-    container_name: coursecoach_backend
     restart: unless-stopped
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: coursecoach
-      DB_USER: coursecoach
-      DB_PASSWORD: coursecoach_pass
-      # OAuth client IDs are public browser identifiers, not secrets. This
-      # shared localhost client lets every teammate use KMITL Google Login.
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-610984601873-obcs09oonbadi58tvgkhr1sbr4muiv92.apps.googleusercontent.com}
-      GOOGLE_ALLOWED_DOMAIN: kmitl.ac.th
-      SESSION_SECRET: ${SESSION_SECRET:-coursecoach-local-dev-change-me}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
-      ALLOW_MOCK_AUTH: ${ALLOW_MOCK_AUTH:-false}
-    ports:
-      # Same reasoning as db: the browser never talks to the backend
-      # directly, only the frontend's Vite proxy does (over the internal
-      # Docker network). Kept on localhost for your own debugging/curl.
-      - "127.0.0.1:5000:5000"
+    environment: *app-env
+    ports: ["127.0.0.1:5001:5000"]
     volumes:
-      # Course-level summary files and profile media persist outside the container.
-      - uploads_data:/app/uploads
-      - avatars_data:/app/avatars
+      - ./backend:/app:ro
+      - community_uploads:/data/uploads
+      - community_avatars:/data/avatars
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--reload"]
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-
-  migrate:
-    image: postgres:16
-    container_name: coursecoach_migrate
-    restart: "no"
-    environment:
-      PGPASSWORD: coursecoach_pass
-    volumes:
-      - ./db/migrations:/migrations:ro
-    command:
-      - sh
-      - -c
-      - until pg_isready -h db -U coursecoach -d coursecoach; do sleep 1; done; sleep 2; for migration in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -h db -U coursecoach -d coursecoach -f "$$migration" || exit 1; done
-    depends_on:
-      db:
-        condition: service_healthy
-
+      migrate: {condition: service_completed_successfully}
   frontend:
     build: ./frontend
-    container_name: coursecoach_frontend
     restart: unless-stopped
-    ports:
-      # Host port 80 so the demo URL is just http://<server-ip> — no port
-      # number to relay to your professor/team. Change back to "3000:3000"
-      # for local development.
-      - "80:3000"
+    ports: ["127.0.0.1:${COMMUNITY_WEB_PORT:-80}:3000"]
+    environment: {CHOKIDAR_USEPOLLING: "true"}
+    volumes: ["./frontend/src:/app/src:ro", "./frontend/vite.config.js:/app/vite.config.js:ro"]
+    depends_on: [backend]
+  seed-mock:
+    profiles: [tools]
+    image: postgres:16
+    environment: {PGPASSWORD: coursecoach_local_only}
+    volumes: ["./db/dev:/seed:ro"]
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-h", "db", "-U", "coursecoach", "-d", "coursecoach_community", "-f", "/seed/seed_mock.sql"]
     depends_on:
-      - backend
-
+      migrate: {condition: service_completed_successfully}
 volumes:
-  db_data:
-  uploads_data:
-  avatars_data:
+  community_db:
+  community_uploads:
+  community_avatars:

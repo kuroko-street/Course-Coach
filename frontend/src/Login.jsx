@@ -38,6 +38,9 @@ export default function Login() {
   const [pending, setPending] = useState(false);
   const [mockUsers, setMockUsers] = useState([]);
   const [mockPendingId, setMockPendingId] = useState(null);
+  const requestedNext = new URLSearchParams(location.search).get("next");
+  const safeNext = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") && !requestedNext.includes("\\") && !requestedNext.startsWith("/login") ? requestedNext : null;
+  const returnPath = safeNext || (location.state?.from ? `${location.state.from.pathname}${location.state.from.search || ""}` : null);
 
   const handleCredential = useCallback(
     async ({ credential }) => {
@@ -45,8 +48,7 @@ export default function Login() {
       setPending(true);
       try {
         const signedIn = await login(credential);
-        const from = location.state?.from?.pathname;
-        navigate(from || (signedIn.role === "ADMIN" ? "/admin" : "/"), {
+        navigate(returnPath || (signedIn.role === "ADMIN" ? "/admin" : "/"), {
           replace: true,
         });
       } catch (err) {
@@ -55,7 +57,7 @@ export default function Login() {
         setPending(false);
       }
     },
-    [location.state, login, navigate]
+    [returnPath, login, navigate]
   );
 
   useEffect(() => {
@@ -82,8 +84,7 @@ export default function Login() {
     setMockPendingId(candidate.user_id);
     try {
       const signedIn = await loginMock(candidate.user_id);
-      const from = location.state?.from?.pathname;
-      navigate(from || (signedIn.role === "ADMIN" ? "/admin" : "/"), {
+      navigate(returnPath || (signedIn.role === "ADMIN" ? "/admin" : "/"), {
         replace: true,
       });
     } catch (err) {
@@ -123,7 +124,7 @@ export default function Login() {
     };
   }, [config, handleCredential]);
 
-  if (authReady && user) return <Navigate to="/" replace />;
+  if (authReady && user) return <Navigate to={returnPath || "/"} replace />;
 
   return (
     <section className="login-page">
@@ -148,6 +149,7 @@ export default function Login() {
         <p className="muted small login-privacy">
           ระบบจะรับเฉพาะชื่อ อีเมล และรูปโปรไฟล์จาก Google โดยไม่รับหรือจัดเก็บรหัสผ่าน
         </p>
+        <p className="muted small">อ่านและค้นหาได้โดยไม่เข้าสู่ระบบ บัญชีมหาวิทยาลัยใช้ยืนยันผู้ใช้ ไม่ใช่การยืนยันว่าเคยเรียนวิชานั้น</p>
       </div>
 
       {config?.mock_login_enabled && (

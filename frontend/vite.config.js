@@ -9,6 +9,8 @@ export default defineConfig({
   server: {
     host: true, // listen on 0.0.0.0 so it's reachable from outside the container
     port: 3000,
+    // Docker Desktop bind mounts on Windows may not emit file change events.
+    watch: { usePolling: process.env.CHOKIDAR_USEPOLLING === "true", interval: 500 },
     proxy: {
       "/api": {
         target: process.env.VITE_API_TARGET || "http://backend:5000",

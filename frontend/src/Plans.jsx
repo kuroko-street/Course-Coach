@@ -101,7 +101,7 @@ export default function Plans() {
               <Link to={`/plans/${p.plan_id}`} style={{ color: "inherit", textDecoration: "none", flex: 1 }}>
                 <strong>{p.plan_name}</strong>
                 <div className="meta">
-                  {p.item_count} วิชา · {p.total_credits} หน่วยกิตรวม
+                  {p.item_count} รายการ · {p.total_credits} หน่วยกิตประมาณ (รหัสซ้ำในเทอมเดียวกันนับครั้งเดียว)
                 </div>
               </Link>
               <button

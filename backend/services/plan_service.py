@@ -4,20 +4,7 @@ from repositories.plan_repository import PlanRepository
 
 
 class PlanService:
-    """Course-planning sandbox: draft study plans a student can build and
-    revise before real registration opens.
-
-    Credit-cap / prerequisite checks are deliberately *soft* (warnings, not
-    hard blocks) — a student sketching a plan may legitimately want to place
-    an over-cap or prerequisite-pending course while they're still figuring
-    things out. `POST /api/reviews` enforces enrollment eligibility hard
-    because that is a data-integrity rule; a study plan is just a draft.
-    """
-
-    MAX_CREDITS_PER_TERM = 22
-    MIN_CREDITS_PER_TERM = 9
-    HEAVY_WORKLOAD_THRESHOLD = 4
-    HEAVY_TERM_COURSE_COUNT = 2
+    """Personal planning only, with no attendance or registration claims."""
 
     def __init__(self, connection_factory=get_connection, plan_repository=None):
         self.connection_factory = connection_factory
@@ -92,7 +79,7 @@ class PlanService:
             self._own_plan(conn, plan_id, user)
             if not self.plans.course_exists(conn, data.course_id):
                 raise ServiceError(404, f"Course id {data.course_id} not found.")
-            if self.plans.item_exists_for_course(conn, plan_id, data.course_id):
+            if self.plans.item_exists_for_course(conn, plan_id, data.course_id, data.academic_year, data.semester):
                 raise ServiceError(409, "This course is already in the plan.")
             item_id = self.plans.add_item(conn, plan_id, data.course_id, data.academic_year, data.semester)
             self.plans.touch(conn, plan_id)
@@ -111,6 +98,8 @@ class PlanService:
             item = self.plans.find_item(conn, item_id)
             if item is None or item["plan_id"] != plan_id:
                 raise ServiceError(404, f"Item id {item_id} not found in this plan.")
+            if self.plans.item_exists_for_course(conn, plan_id, item['course_id'], data.academic_year, data.semester, item_id):
+                raise ServiceError(409, "รายวิชานี้อยู่ในเทอมเป้าหมายนั้นแล้ว")
             self.plans.move_item(conn, item_id, data.academic_year, data.semester)
             self.plans.touch(conn, plan_id)
             conn.commit()
@@ -143,11 +132,6 @@ class PlanService:
         try:
             plan = self._own_plan(conn, plan_id, user)
             items = self.plans.list_items(conn, plan_id)
-            completed = self.plans.completed_course_ids(conn, user["user_id"])
-            prereq_cache = {}
-            for it in items:
-                if it["course_id"] not in prereq_cache:
-                    prereq_cache[it["course_id"]] = self.plans.prerequisites_for(conn, it["course_id"])
         finally:
             conn.close()
 
@@ -156,17 +140,10 @@ class PlanService:
             "plan_name": plan["plan_name"],
             "created_at": plan["created_at"],
             "updated_at": plan["updated_at"],
-            "terms": self._build_terms(items, completed, prereq_cache),
+            "terms": self._build_terms(items),
         }
 
-    def _build_terms(self, items, completed, prereq_cache):
-        earliest_term_for_course = {}
-        for it in items:
-            key = self._term_key(it)
-            current = earliest_term_for_course.get(it["course_id"])
-            if current is None or key < current:
-                earliest_term_for_course[it["course_id"]] = key
-
+    def _build_terms(self, items):
         grouped = {}
         for it in items:
             term_id = (it["academic_year"], it["semester"])
@@ -177,48 +154,26 @@ class PlanService:
         terms = []
         for academic_year, semester in ordered_term_ids:
             term_items = grouped[(academic_year, semester)]
-            total_credits = sum(int(i["credits"]) for i in term_items)
-            heavy_count = sum(
-                1 for i in term_items
-                if i["avg_workload"] is not None and float(i["avg_workload"]) >= self.HEAVY_WORKLOAD_THRESHOLD
-            )
-
             warnings = []
-            if total_credits > self.MAX_CREDITS_PER_TERM:
-                warnings.append({
-                    "code": "OVER_CREDIT_CAP",
-                    "message": f"หน่วยกิตรวม {total_credits} เกินเกณฑ์สูงสุด {self.MAX_CREDITS_PER_TERM} หน่วยกิต",
-                })
-            if total_credits < self.MIN_CREDITS_PER_TERM:
-                warnings.append({
-                    "code": "UNDER_CREDIT_MIN",
-                    "message": f"หน่วยกิตรวม {total_credits} ต่ำกว่าเกณฑ์ขั้นต่ำ {self.MIN_CREDITS_PER_TERM} หน่วยกิต",
-                })
-            if heavy_count >= self.HEAVY_TERM_COURSE_COUNT:
-                warnings.append({
-                    "code": "HEAVY_TERM",
-                    "message": f"เทอมนี้มีวิชาภาระงานหนัก {heavy_count} วิชา",
-                })
-
-            item_rows = []
+            credits_by_code = {}
+            counts = {}
             for it in term_items:
-                missing = []
-                for prereq in prereq_cache.get(it["course_id"], []):
-                    pid = prereq["course_id"]
-                    if pid in completed:
-                        continue
-                    earliest = earliest_term_for_course.get(pid)
-                    if earliest is not None and earliest < self._term_key(it):
-                        continue
-                    missing.append(prereq)
-                item_rows.append({**it, "prerequisite_unmet": len(missing) > 0, "missing_prerequisites": missing})
+                key = it.get('code_normalized') or it['course_code'].strip().casefold()
+                counts[key] = counts.get(key, 0) + 1
+                credits_by_code[key] = max(credits_by_code.get(key, 0), it['credits'])
+            duplicate_codes = [key for key,count in counts.items() if count > 1]
+            if duplicate_codes:
+                warnings.append({'code':'DUPLICATE_CODE','message':'มีรหัสวิชาซ้ำในเทอมนี้: ' + ', '.join(duplicate_codes) + ' ยอดประมาณนับรหัสละหนึ่งครั้ง โดยใช้หน่วยกิตสูงสุดของรายการซ้ำ กรุณาเลือกเก็บรายการที่ต้องการ'})
+            if any(not it.get('is_active', True) for it in term_items):
+                warnings.append({'code':'INACTIVE_COURSE','message':'มีรายการวิชาที่แอดมินปิดแสดงแล้ว ข้อมูลในแผนเป็นเพียงรายการอ้างอิงเดิม'})
 
             terms.append({
                 "academic_year": academic_year,
                 "semester": semester,
-                "total_credits": total_credits,
+                "total_credits": sum(credits_by_code.values()),
+                "raw_credits": sum(it['credits'] for it in term_items),
                 "warnings": warnings,
-                "items": item_rows,
+                "items": term_items,
             })
 
         return terms

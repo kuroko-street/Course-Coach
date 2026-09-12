@@ -1,359 +1,141 @@
 import re
-
 from db import dict_cursor
+from domain.errors import ServiceError
 from repositories.review_repository import REVIEW_FIELDS
+
+ASPECTS = ('satisfaction','recommendation','workload','content','teaching','exam')
+
+# Each lateral aggregate produces ONE row per course: teachers and tags cannot
+# multiply reviews/likes. The search vector is computed per query, not persisted.
+COURSE_ROWS = """
+ SELECT c.*,f.name AS faculty_name,u.name AS university_name,
+ COALESCE(i.instructors,'[]'::json) AS instructors,COALESCE(i.names,'') AS instructor_names,
+ COALESCE(t.tags,'[]'::json) AS tags,COALESCE(t.names,'') AS tag_names,
+ COALESCE(a.names,'') AS aliases,
+ rs.*,COALESCE(ls.total_likes,0) AS total_likes,COALESCE(cs.total_comments,0) AS total_comments
+ FROM courses c JOIN faculties f USING(faculty_id) JOIN universities u ON u.university_id=c.university_id
+ LEFT JOIN LATERAL (SELECT json_agg(json_build_object('instructor_id',i.instructor_id,'name',i.name,'affiliation',i.affiliation) ORDER BY i.name,i.instructor_id) AS instructors,string_agg(i.name,' ') AS names
+ FROM course_instructors ci JOIN instructors i USING(instructor_id) WHERE ci.course_id=c.course_id) i ON TRUE
+ LEFT JOIN LATERAL (SELECT json_agg(x ORDER BY x.review_count DESC,x.tag_id) AS tags,string_agg(x.tag_name,' ') AS names FROM
+ (SELECT t.tag_id,t.tag_name,COUNT(*) AS review_count FROM reviews r JOIN review_tags rt USING(review_id) JOIN tags t USING(tag_id) WHERE r.course_id=c.course_id AND r.status='ACTIVE' GROUP BY t.tag_id,t.tag_name) x) t ON TRUE
+ LEFT JOIN LATERAL (SELECT string_agg(course_code || ' ' || course_name,' ') AS names FROM course_aliases WHERE canonical_course_id=c.course_id) a ON TRUE
+ CROSS JOIN LATERAL (SELECT COUNT(*) AS review_count,COUNT(DISTINCT reviewer_id) AS reviewer_count,
+ """ + ','.join(f'ROUND(AVG(rating_{a}),2) AS avg_{a}' for a in ASPECTS) + """
+ FROM reviews r WHERE r.course_id=c.course_id AND r.status='ACTIVE') rs
+ LEFT JOIN LATERAL (SELECT COUNT(*) AS total_likes FROM review_likes l JOIN reviews r USING(review_id) WHERE r.course_id=c.course_id AND r.status='ACTIVE') ls ON TRUE
+ LEFT JOIN LATERAL (SELECT COUNT(*) AS total_comments FROM review_comments rc JOIN reviews r USING(review_id) WHERE r.course_id=c.course_id AND r.status='ACTIVE' AND rc.status='ACTIVE') cs ON TRUE
+"""
 
 
 class CourseRepository:
+    RANKING_COLUMNS = {'reviews':'review_count','likes':'total_likes',**{a:f'avg_{a}' for a in ASPECTS}}
     _ADVANCED_QUERY = re.compile(r'(^|\s)(OR\b|-) |"', re.IGNORECASE | re.VERBOSE)
 
     @classmethod
     def _plain_terms(cls, query):
-        """Return safe terms for prefix/partial matching.
+        return [] if not query or cls._ADVANCED_QUERY.search(query) else re.findall(r'[^\W_]+',query.casefold(),re.UNICODE)
 
-        PostgreSQL's web-search parser remains responsible for advanced
-        syntax (OR, quoted phrases and exclusions).  Plain user input gets
-        the friendlier prefix and every-term fallback used by type-ahead.
-        Only Unicode word characters survive, so the generated tsquery can
-        never contain operators supplied by the caller.
+    @staticmethod
+    def filters(filters=None, admin=False):
+        filters = filters or {}
+        clauses=['c.university_id=1','c.merged_into_course_id IS NULL']
+        if not admin: clauses.append('c.is_active')
+        params=[]
+        for key in ('faculty_id','department_id','academic_year','semester','department'):
+            if filters.get(key) not in (None,''):
+                clauses.append(f'c.{key}=%s'); params.append(filters[key])
+        if filters.get('code'):
+            clauses.append('c.code_normalized=%s'); params.append(filters['code'].strip().casefold())
+        if filters.get('instructor_ids'):
+            clauses.append('EXISTS(SELECT 1 FROM course_instructors ci WHERE ci.course_id=c.course_id AND ci.instructor_id=ANY(%s))'); params.append(filters['instructor_ids'])
+        for tag in filters.get('tag_ids') or []:
+            clauses.append("EXISTS(SELECT 1 FROM reviews r JOIN review_tags rt USING(review_id) WHERE r.course_id=c.course_id AND r.status='ACTIVE' AND rt.tag_id=%s)"); params.append(tag)
+        return ' AND '.join(clauses),params
+
+    def search(self,conn,search=None,department=None,filters=None,page=1,page_size=20,admin=False):
+        filters=dict(filters or {})
+        if department: filters['department']=department
+        where,params=self.filters(filters,admin)
+        query=(search or '').strip()[:300]
+        terms=self._plain_terms(query)
+        prefix=' & '.join(f'{t}:*' for t in terms)
+        sql="WITH base AS ("+COURSE_ROWS+" WHERE "+where+"""), docs AS (
+          SELECT b.*,concat_ws(' ',course_code,course_name,instructor_names,tag_names,department,aliases) AS search_text,
+          setweight(to_tsvector('simple',course_code || ' ' || course_name || ' ' || instructor_names),'A') ||
+          setweight(to_tsvector('simple',tag_names || ' ' || aliases),'B') || setweight(to_tsvector('simple',department),'C') AS search_document FROM base b
+        ), q AS (SELECT %s::text AS raw,websearch_to_tsquery('simple',%s) AS web,
+        CASE WHEN %s='' THEN NULL ELSE to_tsquery('simple',%s) END AS prefix,%s::text[] AS terms), matches AS (
+        SELECT c.*,CASE WHEN lower(course_code)=lower(q.raw) AND q.raw<>'' THEN 100
+          WHEN lower(course_name)=lower(q.raw) AND q.raw<>'' THEN 90
+          WHEN EXISTS(SELECT 1 FROM json_array_elements(c.tags) t WHERE lower(t->>'tag_name')=lower(q.raw)) THEN 80
+          WHEN EXISTS(SELECT 1 FROM json_array_elements(c.instructors) i WHERE lower(i->>'name')=lower(q.raw)) THEN 70
+          WHEN q.raw<>'' AND lower(course_code) LIKE lower(q.raw)||'%%' THEN 60 ELSE 0 END
+          + ts_rank_cd(search_document,q.web)*30
+          + COALESCE(ts_rank_cd(search_document,q.prefix),0)*20
+          + CASE WHEN q.raw<>'' THEN word_similarity(lower(q.raw),lower(search_text))*10 ELSE 0 END
+          + CASE WHEN cardinality(q.terms)>0 AND NOT EXISTS(SELECT 1 FROM unnest(q.terms) term WHERE position(term in lower(search_text))=0) THEN 5 ELSE 0 END AS relevance
+        FROM docs c CROSS JOIN q WHERE q.raw='' OR search_document@@q.web OR search_document@@q.prefix
+        OR (cardinality(q.terms)>0 AND NOT EXISTS(SELECT 1 FROM unnest(q.terms) term WHERE position(term in lower(search_text))=0))
+        OR (cardinality(q.terms)>0 AND word_similarity(lower(q.raw),lower(search_text))>=0.55))
         """
-        if not query or cls._ADVANCED_QUERY.search(query):
-            return []
-        return re.findall(r"[^\W_]+", query.casefold(), flags=re.UNICODE)
-
-    def list_departments(self, conn):
+        params += [query,query,prefix,prefix,terms]
         with dict_cursor(conn) as cur:
-            cur.execute(
-                "SELECT DISTINCT department FROM courses "
-                "WHERE is_active = TRUE ORDER BY department;"
-            )
-            return [row["department"] for row in cur.fetchall()]
+            cur.execute(sql+' SELECT COUNT(*) AS total FROM matches',params); total=cur.fetchone()['total']
+            cur.execute(sql+' SELECT * FROM matches ORDER BY relevance DESC,review_count DESC,course_code,academic_year DESC,semester,course_id LIMIT %s OFFSET %s',[*params,page_size,(page-1)*page_size])
+            rows=cur.fetchall()
+        return dict(courses=rows,total=total,page=page,page_size=page_size)
 
-    def list_tags(self, conn):
+    def get_detail(self,conn,course_id):
         with dict_cursor(conn) as cur:
-            cur.execute("SELECT tag_id, tag_name FROM tags ORDER BY tag_name;")
+            cur.execute('SELECT course_id,merged_into_course_id FROM courses WHERE course_id=%s',(course_id,)); original=cur.fetchone()
+            if original is None: return None
+            visited=set()
+            while original['merged_into_course_id']:
+                if original['course_id'] in visited: raise ServiceError(409,'Course redirect cycle')
+                visited.add(original['course_id'])
+                cur.execute('SELECT course_id,merged_into_course_id FROM courses WHERE course_id=%s',(original['merged_into_course_id'],)); original=cur.fetchone()
+            cur.execute(COURSE_ROWS+' WHERE c.course_id=%s AND c.is_active AND c.merged_into_course_id IS NULL',(original['course_id'],))
+            row=cur.fetchone()
+        if row:
+            row['averages']={key:row[key] for key in ['review_count',*(f'avg_{a}' for a in ASPECTS)]}
+            row['redirected_from']=course_id if course_id!=row['course_id'] else None
+        return row
+
+    def list_reviews(self,conn,course_id,caller_id=None):
+        course=self.get_detail(conn,course_id)
+        if not course: raise ServiceError(404,'Course not found')
+        with dict_cursor(conn) as cur:
+            cur.execute(f"""SELECT {REVIEW_FIELDS},COALESCE(NULLIF(u.display_name,''),u.username) AS reviewer_name,u.avatar_url AS reviewer_avatar,
+            (SELECT COUNT(*) FROM review_likes l WHERE l.review_id=r.review_id) AS like_count,
+            (SELECT COUNT(*) FROM review_comments rc WHERE rc.review_id=r.review_id AND rc.status='ACTIVE') AS comment_count,
+            EXISTS(SELECT 1 FROM review_likes l WHERE l.review_id=r.review_id AND l.user_id=%s) AS liked_by_me,
+            EXISTS(SELECT 1 FROM review_reports rp WHERE rp.review_id=r.review_id AND rp.reporter_id=%s) AS reported_by_me,
+            COALESCE((SELECT json_agg(t ORDER BY t.tag_id) FROM review_tags rt JOIN tags t USING(tag_id) WHERE rt.review_id=r.review_id),'[]'::json) AS tags
+            FROM reviews r JOIN users u ON u.user_id=r.reviewer_id WHERE r.course_id=%s AND r.status='ACTIVE' ORDER BY r.created_at DESC,r.review_id DESC""",(caller_id,caller_id,course['course_id']))
             return cur.fetchall()
 
-    def search(self, conn, search=None, department=None):
-        query = search.strip() if search and search.strip() else ""
-        terms = self._plain_terms(query)
-        prefix_query = " & ".join(f"{term}:*" for term in terms)
-
-        # Inactive courses remain in the database for historical reviews and
-        # auditability, but they must not appear in the public catalog/search.
-        clauses, filter_params = ["c.is_active = TRUE"], []
-        if query:
-            clauses.append(
-                "(c.search_document @@ q.web_query "
-                "OR (q.prefix_query IS NOT NULL AND c.search_document @@ q.prefix_query) "
-                "OR (CARDINALITY(q.terms) > 0 AND NOT EXISTS ("
-                "    SELECT 1 FROM UNNEST(q.terms) AS term "
-                "    WHERE c.search_text NOT ILIKE ('%%' || term || '%%')"
-                ")) "
-                "OR WORD_SIMILARITY(q.query_text, c.search_text) >= 0.55)"
-            )
-        if department and department.strip():
-            clauses.append("c.department = %s")
-            filter_params.append(department.strip())
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    def get_instructor_profile(self,conn,instructor_id):
         with dict_cursor(conn) as cur:
-            cur.execute(
-                f"""
-                WITH query_params AS (
-                    SELECT %s::text AS query_text,
-                           WEBSEARCH_TO_TSQUERY('simple', %s) AS web_query,
-                           CASE WHEN %s = '' THEN NULL
-                                ELSE TO_TSQUERY('simple', %s) END AS prefix_query,
-                           %s::text[] AS terms
-                ), searchable_courses AS (
-                    SELECT c.*,
-                           COALESCE((
-                               SELECT STRING_AGG(DISTINCT i.name, ' ')
-                               FROM course_instructors ci
-                               JOIN instructors i ON i.instructor_id = ci.instructor_id
-                               WHERE ci.course_id = c.course_id
-                           ), '') AS instructor_names,
-                           COALESCE((
-                               SELECT STRING_AGG(DISTINCT t.tag_name, ' ')
-                               FROM course_tags ct
-                               JOIN tags t ON t.tag_id = ct.tag_id
-                               WHERE ct.course_id = c.course_id
-                           ), '') AS tag_names,
-                           COALESCE((
-                               SELECT ARRAY_AGG(DISTINCT i.name ORDER BY i.name)
-                               FROM course_instructors ci
-                               JOIN instructors i ON i.instructor_id = ci.instructor_id
-                               WHERE ci.course_id = c.course_id
-                           ), ARRAY[]::varchar[]) AS instructors,
-                           COALESCE((
-                               SELECT ARRAY_AGG(DISTINCT t.tag_name ORDER BY t.tag_name)
-                               FROM course_tags ct
-                               JOIN tags t ON t.tag_id = ct.tag_id
-                               WHERE ct.course_id = c.course_id
-                           ), ARRAY[]::varchar[]) AS tags
-                    FROM courses c
-                ), search_ready AS (
-                    SELECT c.*,
-                           CONCAT_WS(' ', c.course_code, c.course_name, c.department,
-                                     c.instructor_names, c.tag_names) AS search_text,
-                           SETWEIGHT(TO_TSVECTOR('simple', COALESCE(c.course_code, '')), 'A') ||
-                           SETWEIGHT(TO_TSVECTOR('simple', COALESCE(c.course_name, '')), 'A') ||
-                           SETWEIGHT(TO_TSVECTOR('simple', COALESCE(c.instructor_names, '')), 'A') ||
-                           SETWEIGHT(TO_TSVECTOR('simple', COALESCE(c.tag_names, '')), 'B') ||
-                           SETWEIGHT(TO_TSVECTOR('simple', COALESCE(c.department, '')), 'C')
-                               AS search_document
-                    FROM searchable_courses c
-                )
-                SELECT c.course_id, c.course_code, c.course_name, c.department,
-                       (SELECT COUNT(*) FROM reviews r
-                        WHERE r.course_id = c.course_id AND r.status = 'ACTIVE') AS review_count,
-                       (SELECT ROUND(AVG(r2.rating_satisfaction)::numeric, 1)
-                        FROM reviews r2 WHERE r2.course_id = c.course_id
-                        AND r2.status = 'ACTIVE') AS avg_rating,
-                       c.tags, c.instructors,
-                       CASE WHEN q.query_text = '' THEN 0 ELSE
-                           CASE
-                               WHEN LOWER(c.course_code) = LOWER(q.query_text) THEN 100
-                               WHEN LOWER(c.course_name) = LOWER(q.query_text) THEN 90
-                               WHEN LOWER(c.instructor_names) = LOWER(q.query_text) THEN 80
-                               WHEN LOWER(c.tag_names) = LOWER(q.query_text) THEN 70
-                               WHEN c.course_code ILIKE (q.query_text || '%%') THEN 60
-                               ELSE 0
-                           END
-                           + TS_RANK_CD(c.search_document, q.web_query) * 30
-                           + CASE WHEN q.prefix_query IS NULL THEN 0 ELSE
-                               TS_RANK_CD(c.search_document, q.prefix_query) * 20 END
-                           + WORD_SIMILARITY(q.query_text, c.search_text) * 10
-                           + CASE WHEN CARDINALITY(q.terms) > 0 AND NOT EXISTS (
-                               SELECT 1 FROM UNNEST(q.terms) AS term
-                               WHERE c.search_text NOT ILIKE ('%%' || term || '%%')
-                             ) THEN 5 ELSE 0 END
-                         END AS search_score
-                FROM search_ready c
-                CROSS JOIN query_params q
-                {where}
-                ORDER BY search_score DESC, c.course_code;
-                """,
-                [query, query, prefix_query, prefix_query, terms, *filter_params],
-            )
+            cur.execute('SELECT instructor_id,name,affiliation,bio FROM instructors WHERE instructor_id=%s',(instructor_id,)); instructor=cur.fetchone()
+            if not instructor: return None
+            cur.execute(COURSE_ROWS+" WHERE c.is_active AND c.merged_into_course_id IS NULL AND EXISTS(SELECT 1 FROM course_instructors ci WHERE ci.course_id=c.course_id AND ci.instructor_id=%s) ORDER BY c.academic_year DESC,c.course_id",(instructor_id,))
+            return instructor,cur.fetchall()
+
+    def rankings(self,conn,metric='reviews',department=None,min_reviews=0,filters=None):
+        filters=dict(filters or {})
+        if department: filters['department']=department
+        where,params=self.filters(filters)
+        column=self.RANKING_COLUMNS[metric]
+        with dict_cursor(conn) as cur:
+            cur.execute('WITH ranked AS ('+COURSE_ROWS+' WHERE '+where+') SELECT *, '+column+' AS metric_value FROM ranked WHERE review_count>=%s ORDER BY '+column+' DESC NULLS LAST,review_count DESC,avg_satisfaction DESC NULLS LAST,course_code,course_id LIMIT 100',[*params,min_reviews])
             return cur.fetchall()
 
-    def get_detail(self, conn, course_id):
+    def dashboard_summary(self,conn,filters=None):
+        where,params=self.filters(filters)
         with dict_cursor(conn) as cur:
-            cur.execute(
-                """
-                SELECT course_id, course_code, course_name, department,
-                       prerequisites, syllabus, teaching_format, workload, assessment
-                FROM courses WHERE course_id = %s;
-                """,
-                (course_id,),
-            )
-            course = cur.fetchone()
-            if course is None:
-                return None
-            cur.execute(
-                """
-                SELECT i.instructor_id, i.name, i.bio, i.teaching_style, i.grading_style
-                FROM instructors i
-                JOIN course_instructors ci ON ci.instructor_id = i.instructor_id
-                WHERE ci.course_id = %s ORDER BY i.name;
-                """,
-                (course_id,),
-            )
-            instructors = cur.fetchall()
-            cur.execute(
-                """
-                SELECT t.tag_id, t.tag_name FROM tags t
-                JOIN course_tags ct ON ct.tag_id = t.tag_id
-                WHERE ct.course_id = %s ORDER BY t.tag_name;
-                """,
-                (course_id,),
-            )
-            tags = cur.fetchall()
-            cur.execute(
-                """
-                SELECT ROUND(AVG(rating_satisfaction)::numeric, 2) AS avg_satisfaction,
-                       ROUND(AVG(rating_recommendation)::numeric, 2) AS avg_recommendation,
-                       ROUND(AVG(rating_workload)::numeric, 2) AS avg_workload,
-                       ROUND(AVG(rating_content)::numeric, 2) AS avg_content,
-                       ROUND(AVG(rating_teaching)::numeric, 2) AS avg_teaching,
-                       ROUND(AVG(rating_exam)::numeric, 2) AS avg_exam,
-                       COUNT(*) AS review_count
-                FROM reviews WHERE course_id = %s AND status = 'ACTIVE';
-                """,
-                (course_id,),
-            )
-            averages = cur.fetchone()
-        return course, instructors, tags, averages
-
-    def get_instructor_profile(self, conn, instructor_id):
-        with dict_cursor(conn) as cur:
-            cur.execute(
-                """
-                SELECT instructor_id, name, bio, teaching_style, grading_style
-                FROM instructors WHERE instructor_id = %s;
-                """,
-                (instructor_id,),
-            )
-            instructor = cur.fetchone()
-            if instructor is None:
-                return None
-            cur.execute(
-                """
-                SELECT c.course_id, c.course_code, c.course_name, c.department
-                FROM courses c
-                JOIN course_instructors ci ON ci.course_id = c.course_id
-                WHERE ci.instructor_id = %s AND c.is_active = TRUE
-                ORDER BY c.course_code;
-                """,
-                (instructor_id,),
-            )
-            courses = cur.fetchall()
-        return instructor, courses
-
-    def list_reviews(self, conn, course_id, caller_id=None):
-        with dict_cursor(conn) as cur:
-            cur.execute(
-                f"""
-                SELECT {REVIEW_FIELDS}, c.course_code, c.course_name, c.department,
-                       COALESCE(NULLIF(u.display_name, ''), u.username) AS reviewer_name,
-                       u.avatar_url AS reviewer_avatar,
-                       (SELECT COUNT(*) FROM review_likes rl WHERE rl.review_id = r.review_id) AS like_count,
-                       (SELECT COUNT(*) FROM review_comments rc WHERE rc.review_id = r.review_id) AS comment_count,
-                       EXISTS(SELECT 1 FROM review_likes rl2
-                              WHERE rl2.review_id = r.review_id AND rl2.user_id = %s) AS liked_by_me
-                FROM reviews r
-                JOIN courses c ON c.course_id = r.course_id
-                JOIN users u ON u.user_id = r.reviewer_id
-                WHERE r.course_id = %s AND r.status = 'ACTIVE'
-                ORDER BY r.created_at DESC, r.review_id DESC;
-                """,
-                (caller_id, course_id),
-            )
-            return cur.fetchall()
-
-    def list_my_enrollments(self, conn, user_id, course_id):
-        with dict_cursor(conn) as cur:
-            cur.execute(
-                """
-                SELECT e.enrollment_id, e.academic_year, e.semester, e.section,
-                       EXISTS(SELECT 1 FROM reviews r
-                              WHERE r.course_id = e.course_id AND r.reviewer_id = e.student_id
-                              AND r.academic_year = e.academic_year AND r.semester = e.semester
-                              AND r.section = e.section AND r.status <> 'DELETED') AS reviewed
-                FROM enrollments e
-                WHERE e.student_id = %s AND e.course_id = %s
-                ORDER BY e.academic_year DESC, e.semester DESC, e.section;
-                """,
-                (user_id, course_id),
-            )
-            return cur.fetchall()
-
-    RANKING_COLUMNS = {
-        "reviews": "review_count",
-        "likes": "total_likes",
-        "comments": "total_comments",
-        "satisfaction": "avg_satisfaction",
-        "recommendation": "avg_recommendation",
-        "workload": "avg_workload",
-        "content": "avg_content",
-        "teaching": "avg_teaching",
-        "exam": "avg_exam",
-    }
-
-    def dashboard_summary(self, conn):
-        with dict_cursor(conn) as cur:
-            cur.execute(
-                """
-                SELECT
-                    (SELECT COUNT(*) FROM courses WHERE is_active = TRUE) AS course_count,
-                    (SELECT COUNT(*) FROM reviews WHERE status = 'ACTIVE') AS review_count,
-                    (SELECT COUNT(DISTINCT reviewer_id) FROM reviews
-                     WHERE status = 'ACTIVE') AS reviewer_count,
-                    (SELECT COUNT(*) FROM review_likes rl
-                     JOIN reviews r ON r.review_id = rl.review_id
-                     WHERE r.status = 'ACTIVE') AS total_likes,
-                    (SELECT COUNT(*) FROM review_comments rc
-                     JOIN reviews r ON r.review_id = rc.review_id
-                     WHERE r.status = 'ACTIVE') AS total_comments,
-                    (SELECT ROUND(AVG(rating_satisfaction)::numeric, 2)
-                     FROM reviews WHERE status = 'ACTIVE') AS avg_satisfaction;
-                """
-            )
+            cur.execute('WITH chosen AS (SELECT c.course_id FROM courses c WHERE '+where+"""), active AS (SELECT r.* FROM reviews r JOIN chosen USING(course_id) WHERE status='ACTIVE')
+            SELECT (SELECT COUNT(*) FROM chosen) AS course_count,COUNT(*) AS review_count,COUNT(DISTINCT reviewer_id) AS reviewer_count,
+            ROUND(AVG(rating_satisfaction),2) AS avg_satisfaction,
+            (SELECT COUNT(*) FROM review_likes l JOIN active a USING(review_id)) AS total_likes,
+            (SELECT COUNT(*) FROM review_comments rc JOIN active a USING(review_id) WHERE rc.status='ACTIVE') AS total_comments FROM active""",params)
             return cur.fetchone()
-
-    def rankings(self, conn, metric="reviews", department=None, min_reviews=0):
-        metric_source = {
-            "reviews": "COALESCE(rs.review_count, 0)",
-            "likes": "COALESCE(ls.total_likes, 0)",
-            "comments": "COALESCE(cs.total_comments, 0)",
-            "satisfaction": "rs.avg_satisfaction",
-            "recommendation": "rs.avg_recommendation",
-            "workload": "rs.avg_workload",
-            "content": "rs.avg_content",
-            "teaching": "rs.avg_teaching",
-            "exam": "rs.avg_exam",
-        }[metric]
-        clauses, params = [
-            "c.is_active = TRUE",
-            "COALESCE(rs.review_count, 0) >= %s",
-        ], [min_reviews]
-        if department and department.strip():
-            clauses.append("c.department = %s")
-            params.append(department.strip())
-        where = " AND ".join(clauses)
-
-        if metric == "reviews":
-            tie_breakers = "avg_satisfaction DESC NULLS LAST, c.course_code"
-        elif metric in {"likes", "comments"}:
-            tie_breakers = "review_count DESC, avg_satisfaction DESC NULLS LAST, c.course_code"
-        else:
-            tie_breakers = "review_count DESC, c.course_code"
-
-        with dict_cursor(conn) as cur:
-            cur.execute(
-                f"""
-                WITH review_stats AS (
-                    SELECT course_id,
-                           COUNT(*) AS review_count,
-                           COUNT(DISTINCT reviewer_id) AS reviewer_count,
-                           ROUND(AVG(rating_satisfaction)::numeric, 2) AS avg_satisfaction,
-                           ROUND(AVG(rating_recommendation)::numeric, 2) AS avg_recommendation,
-                           ROUND(AVG(rating_workload)::numeric, 2) AS avg_workload,
-                           ROUND(AVG(rating_content)::numeric, 2) AS avg_content,
-                           ROUND(AVG(rating_teaching)::numeric, 2) AS avg_teaching,
-                           ROUND(AVG(rating_exam)::numeric, 2) AS avg_exam
-                    FROM reviews
-                    WHERE status = 'ACTIVE'
-                    GROUP BY course_id
-                ), like_stats AS (
-                    SELECT r.course_id, COUNT(*) AS total_likes
-                    FROM review_likes rl
-                    JOIN reviews r ON r.review_id = rl.review_id
-                    WHERE r.status = 'ACTIVE'
-                    GROUP BY r.course_id
-                ), comment_stats AS (
-                    SELECT r.course_id, COUNT(*) AS total_comments
-                    FROM review_comments rc
-                    JOIN reviews r ON r.review_id = rc.review_id
-                    WHERE r.status = 'ACTIVE'
-                    GROUP BY r.course_id
-                )
-                SELECT c.course_id, c.course_code, c.course_name, c.department,
-                       COALESCE(rs.review_count, 0) AS review_count,
-                       COALESCE(rs.reviewer_count, 0) AS reviewer_count,
-                       rs.avg_satisfaction, rs.avg_recommendation, rs.avg_workload,
-                       rs.avg_content, rs.avg_teaching, rs.avg_exam,
-                       COALESCE(ls.total_likes, 0) AS total_likes,
-                       COALESCE(cs.total_comments, 0) AS total_comments,
-                       {metric_source} AS metric_value
-                FROM courses c
-                LEFT JOIN review_stats rs ON rs.course_id = c.course_id
-                LEFT JOIN like_stats ls ON ls.course_id = c.course_id
-                LEFT JOIN comment_stats cs ON cs.course_id = c.course_id
-                WHERE {where}
-                ORDER BY metric_value DESC NULLS LAST, {tie_breakers};
-                """,
-                params,
-            )
-            return cur.fetchall()

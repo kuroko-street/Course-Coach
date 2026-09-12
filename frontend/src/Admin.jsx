@@ -1,244 +1,60 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api, apiUpload } from "./api.js";
-import { useAuth } from "./AuthContext.jsx";
+import {useEffect,useState} from 'react';
+import {Link} from 'react-router-dom';
+import {api} from './api.js';
+import CourseForm,{coursePayload,numericPayload} from './components/CourseForm.jsx';
+import {CatalogFilters,CourseContext,useCatalogOptions} from './components/CourseUI.jsx';
 
-const emptyCourse = { course_code: "", course_name: "", department: "", prerequisites: "", syllabus: "", teaching_format: "", workload: "", assessment: "", tags_text: "", instructor_names: [], curriculum_mappings: [] };
-const emptyMapping = () => ({ curriculum_id: "", recommended_year: "1", recommended_semester: "1", requirement_type: "REQUIRED" });
-
-export default function Admin() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState("reports");
-  const [reviews, setReviews] = useState([]);
-  const [reportedFiles, setReportedFiles] = useState([]);
-  const [reportSummary, setReportSummary] = useState({ pending_count: 0, reviewed_count: 0 });
-  const [queueOpen, setQueueOpen] = useState(true);
-  const [courses, setCourses] = useState([]);
-  const [instructors, setInstructors] = useState([]);
-  const [curriculums, setCurriculums] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [courseForm, setCourseForm] = useState(emptyCourse);
-  const [importPreview, setImportPreview] = useState(null);
-  const [studentImportPreview, setStudentImportPreview] = useState(null);
-  const [curriculumForm, setCurriculumForm] = useState({ curriculum_name: "", academic_year: "2569", department: "", degree_level: "ปริญญาตรี" });
-  const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const [reportData, fileData, summaryData, courseData, curriculumData, instructorData, studentData] = await Promise.all([
-        api("/admin/reports", { userId: user.user_id }), api("/admin/summary-files", { userId: user.user_id }), api("/admin/reports/summary", { userId: user.user_id }), api("/admin/courses", { userId: user.user_id }), api("/admin/curriculums", { userId: user.user_id }), api("/admin/instructors", { userId: user.user_id }), api("/admin/students", { userId: user.user_id }),
-      ]);
-      setReviews(reportData.reviews || []); setReportedFiles(fileData.files || []); setReportSummary(summaryData); setCourses(courseData.courses || []); setCurriculums(curriculumData.curriculums || []); setInstructors(instructorData.instructors || []); setStudents(studentData.students || []);
-    } catch (err) { setError(err.message); } finally { setLoading(false); }
-  }, [user.user_id]);
-  useEffect(() => { load(); }, [load]);
-  function flash(message) { setError(""); setSuccess(message); }
-
-  async function handleAction(reviewId, action) {
-    setBusyId(`review-${reviewId}`);
-    try { const data = await api(`/admin/reviews/${reviewId}/action`, { method: "POST", userId: user.user_id, body: { action } }); flash(`รีวิว #${reviewId}: ${data.message}`); await load(); }
-    catch (err) { setError(err.message); } finally { setBusyId(null); }
-  }
-  async function handleFileAction(fileId, action) {
-    setBusyId(`file-${fileId}`);
-    try { const data = await api(`/admin/summary-files/${fileId}/action`, { method: "POST", userId: user.user_id, body: { action } }); flash(`ไฟล์ #${fileId}: ${data.message}`); await load(); }
-    catch (err) { setError(err.message); } finally { setBusyId(null); }
-  }
-  function startEdit(course) {
-    setEditingId(course.course_id);
-    setCourseForm({
-      ...emptyCourse,
-      ...course,
-      tags_text: (course.tags || []).join(", "),
-      instructor_names: course.instructors || [],
-      curriculum_mappings: (course.curriculum_mappings || []).map((mapping) => ({
-        curriculum_id: String(mapping.curriculum_id),
-        recommended_year: String(mapping.recommended_year),
-        recommended_semester: mapping.recommended_semester,
-        requirement_type: mapping.requirement_type,
-      })),
-    });
-    setTab("courses"); window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-  async function saveCourse(event) {
-    event.preventDefault(); setBusyId("course-form");
-    try {
-      const { curriculum_mappings: formMappings, tags_text, instructor_names, ...base } = courseForm;
-      const curriculum_mappings = formMappings.filter((mapping) => mapping.curriculum_id).map((mapping) => ({
-        curriculum_id: Number(mapping.curriculum_id),
-        recommended_year: Number(mapping.recommended_year),
-        recommended_semester: mapping.recommended_semester,
-        requirement_type: mapping.requirement_type,
-      }));
-      const tag_names = [...new Set(tags_text.split(",").map((tag) => tag.trim()).filter(Boolean))];
-      const data = await api(editingId ? `/admin/courses/${editingId}` : "/admin/courses", { method: editingId ? "PUT" : "POST", userId: user.user_id, body: { ...base, curriculum_mappings, tag_names, instructor_names } });
-      flash(data.message); setCourseForm(emptyCourse); setEditingId(null); await load();
-    } catch (err) { setError(err.message); } finally { setBusyId(null); }
-  }
-  function updateMapping(index, key, value) {
-    setCourseForm((current) => ({
-      ...current,
-      curriculum_mappings: current.curriculum_mappings.map((mapping, mappingIndex) =>
-        mappingIndex === index ? { ...mapping, [key]: value } : mapping
-      ),
-    }));
-  }
-  function removeMapping(index) {
-    setCourseForm((current) => ({
-      ...current,
-      curriculum_mappings: current.curriculum_mappings.filter((_, mappingIndex) => mappingIndex !== index),
-    }));
-  }
-  async function createInstructor(name) {
-    const data = await api("/admin/instructors", { method: "POST", userId: user.user_id, body: { name } });
-    setInstructors((current) => [...current, data.instructor].sort((a, b) => a.name.localeCompare(b.name, "th")));
-    setCourseForm((current) => ({ ...current, instructor_names: [...current.instructor_names, data.instructor.name] }));
-  }
-  async function toggleCourse(course) {
-    setBusyId(`course-${course.course_id}`);
-    try { const data = await api(`/admin/courses/${course.course_id}/status`, { method: "PATCH", userId: user.user_id, body: { is_active: !course.is_active } }); flash(`${course.course_code}: ${data.message}`); await load(); }
-    catch (err) { setError(err.message); } finally { setBusyId(null); }
-  }
-  async function saveCurriculum(event) {
-    event.preventDefault(); setBusyId("curriculum-form");
-    try { const data = await api("/admin/curriculums", { method: "POST", userId: user.user_id, body: { ...curriculumForm, academic_year: Number(curriculumForm.academic_year) } }); flash(`${data.curriculum.curriculum_name} ถูกเพิ่มแล้ว`); setCurriculumForm({ curriculum_name: "", academic_year: "2569", department: "", degree_level: "ปริญญาตรี" }); await load(); }
-    catch (err) { setError(err.message); } finally { setBusyId(null); }
-  }
-  async function previewImport(event) {
-    event.preventDefault();
-    const file = event.target.elements.excel_file.files[0];
-    if (!file) { setError("เลือกไฟล์ Excel ก่อน"); return; }
-    setBusyId("import-preview"); setError(""); setSuccess("");
-    try {
-      const data = await apiUpload("/admin/courses/import/preview", { file, userId: user.user_id });
-      setImportPreview(data);
-    } catch (err) { setError(err.message); setImportPreview(null); } finally { setBusyId(null); }
-  }
-  async function confirmImport() {
-    if (!importPreview || importPreview.invalid_count) return;
-    setBusyId("import-confirm");
-    try {
-      const data = await api("/admin/courses/import", { method: "POST", userId: user.user_id, body: { rows: importPreview.rows } });
-      const skipped = data.results.filter((row) => row.operation === "skipped").length;
-      flash(`ประมวลผล ${data.imported_count} รายการ · เพิ่ม/อัปเดต ${data.imported_count - skipped} · ข้ามข้อมูลที่ตรงกัน ${skipped}`); setImportPreview(null); await load();
-    } catch (err) { setError(err.message); } finally { setBusyId(null); }
-  }
-  async function previewStudentImport(event) {
-    event.preventDefault();
-    const file = event.target.elements.student_file.files[0];
-    if (!file) { setError("เลือกไฟล์ข้อมูลนักศึกษาก่อน"); return; }
-    setBusyId("student-import-preview"); setError(""); setSuccess("");
-    try {
-      const data = await apiUpload("/admin/students/import/preview", { file, userId: user.user_id });
-      setStudentImportPreview(data);
-    } catch (err) { setError(err.message); setStudentImportPreview(null); } finally { setBusyId(null); }
-  }
-  async function confirmStudentImport() {
-    if (!studentImportPreview || studentImportPreview.invalid_count) return;
-    setBusyId("student-import-confirm");
-    try {
-      const data = await api("/admin/students/import", { method: "POST", userId: user.user_id, body: { rows: studentImportPreview.rows } });
-      flash(`ประมวลผล ${data.processed_count} รายการ · เพิ่มสิทธิ์ ${data.created_count} · ข้ามข้อมูลเดิม ${data.skipped_count}`);
-      setStudentImportPreview(null); await load();
-    } catch (err) { setError(err.message); } finally { setBusyId(null); }
-  }
-  const setCourse = (key) => (value) => setCourseForm({ ...courseForm, [key]: value });
-  const setCurriculum = (key) => (value) => setCurriculumForm({ ...curriculumForm, [key]: value });
-
-  return <section>
-    <h1>ผู้ดูแลระบบ</h1><p className="muted">ตรวจสอบรีวิวและไฟล์ที่ถูกรายงาน รวมถึงจัดการข้อมูลรายวิชา/หลักสูตร</p>
-    <div className="admin-tabs"><button className={tab === "reports" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("reports")}>คิวรีวิว ({reviews.length})</button><button className={tab === "reported-files" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("reported-files")}>คิวไฟล์ ({reportedFiles.length})</button><button className={tab === "courses" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("courses")}>จัดการรายวิชา</button><button className={tab === "curriculums" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("curriculums")}>หลักสูตร</button><button className={tab === "import" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("import")}>Import วิชา</button><button className={tab === "students" ? "admin-tab active" : "admin-tab"} onClick={() => setTab("students")}>นักศึกษา/สิทธิ์รีวิว</button></div>
-    {error && <div className="alert alert-error">{error}</div>}{success && <div className="alert alert-success">{success}</div>}
-    {tab === "reports" && <Reports loading={loading} reviews={reviews} summary={reportSummary} queueOpen={queueOpen} onToggleQueue={() => setQueueOpen((open) => !open)} busyId={busyId} onAction={handleAction} />}
-    {tab === "reported-files" && <ReportedFiles loading={loading} files={reportedFiles} busyId={busyId} onAction={handleFileAction} />}
-    {tab === "courses" && <>
-      <h2>{editingId ? `แก้ไขรายวิชา #${editingId}` : "เพิ่มรายวิชา"}</h2>
-      <form className="card" onSubmit={saveCourse}>
-        <div className="row"><Field label="รหัสวิชา" value={courseForm.course_code} onChange={setCourse("course_code")} required /><Field label="ชื่อวิชา" value={courseForm.course_name} onChange={setCourse("course_name")} required /></div><Field label="ภาควิชา" value={courseForm.department} onChange={setCourse("department")} required />
-        <div className="curriculum-mapping-editor">
-          <div className="mapping-heading"><label>หลักสูตรที่ใช้รายวิชานี้ (ไม่บังคับ)</label><button type="button" className="btn btn-ghost" onClick={() => setCourseForm((current) => ({ ...current, curriculum_mappings: [...current.curriculum_mappings, emptyMapping()] }))}>＋ เพิ่มหลักสูตร</button></div>
-          {courseForm.curriculum_mappings.map((mapping, index) => <div className="curriculum-mapping-row" key={`${mapping.curriculum_id}-${index}`}>
-            <Select label="หลักสูตร" value={mapping.curriculum_id} onChange={(value) => updateMapping(index, "curriculum_id", value)}><option value="">เลือกหลักสูตร</option>{curriculums.map((c) => <option value={c.curriculum_id} key={c.curriculum_id}>{c.curriculum_name} ({c.academic_year})</option>)}</Select>
-            <Select label="ประเภทวิชา" value={mapping.requirement_type} onChange={(value) => updateMapping(index, "requirement_type", value)}><option value="REQUIRED">วิชาบังคับ</option><option value="ELECTIVE">วิชาเลือก</option></Select>
-            <Field label="ชั้นปีแนะนำ" type="number" value={mapping.recommended_year} onChange={(value) => updateMapping(index, "recommended_year", value)} required />
-            <Field label="เทอมแนะนำ" value={mapping.recommended_semester} onChange={(value) => updateMapping(index, "recommended_semester", value)} required />
-            <button type="button" className="btn btn-danger-outline mapping-remove" onClick={() => removeMapping(index)}>ลบ</button>
-          </div>)}
-          {!courseForm.curriculum_mappings.length && <small className="muted">ยังไม่ได้ผูกกับหลักสูตรใด</small>}
-        </div>
-        <TextField label="วิชาบังคับก่อน" value={courseForm.prerequisites} onChange={setCourse("prerequisites")} /><TextField label="คำอธิบาย/เนื้อหา" value={courseForm.syllabus} onChange={setCourse("syllabus")} /><InstructorPicker value={courseForm.instructor_names} options={instructors} onChange={(value) => setCourseForm({ ...courseForm, instructor_names: value })} onCreate={createInstructor} /><Field label="Tags (คั่นด้วย comma)" value={courseForm.tags_text} onChange={setCourse("tags_text")} />
-        <div className="form-footer"><button disabled={busyId !== null}>{busyId === "course-form" ? "กำลังบันทึก…" : editingId ? "บันทึกการแก้ไข" : "เพิ่มรายวิชา"}</button>{editingId && <button type="button" className="btn btn-ghost" onClick={() => { setEditingId(null); setCourseForm(emptyCourse); }}>ยกเลิก</button>}</div>
-      </form><h2>รายวิชาทั้งหมด</h2>{loading ? <p className="muted">Loading courses…</p> : <CourseList courses={courses} busyId={busyId} onEdit={startEdit} onToggle={toggleCourse} />}
+const FIELD_LABELS={course_code:'รหัส',course_name:'ชื่อวิชา',faculty_id:'คณะ',department_id:'สาขา',academic_year:'ปี',semester:'เทอม',credits:'หน่วยกิต',instructor_ids:'ชุดผู้สอน',syllabus:'คำอธิบาย',additional_details:'รายละเอียดเพิ่มเติม'};
+export default function Admin(){
+  const {options,error:optionsError}=useCatalogOptions();
+  const [filters,setFilters]=useState({});const [search,setSearch]=useState('');const [code,setCode]=useState('');const [page,setPage]=useState(1);
+  const [data,setData]=useState({courses:[],total:0});const [selected,setSelected]=useState([]);const [mode,setMode]=useState(null);
+  const [primary,setPrimary]=useState(null);const [form,setForm]=useState(coursePayload());const [reason,setReason]=useState('');const [keep,setKeep]=useState([]);
+  const [preview,setPreview]=useState(null);const [requestId,setRequestId]=useState('');const [history,setHistory]=useState([]);
+  const [keepReviews,setKeepReviews]=useState([]);const [acceptOverage,setAcceptOverage]=useState(false);
+  const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [refresh,setRefresh]=useState(0);
+  const qs=new URLSearchParams({search,code,page,page_size:50});Object.entries(filters).forEach(([k,v])=>{if(Array.isArray(v))v.forEach(x=>qs.append(k,x));else if(v!=='')qs.set(k,v);});const query=qs.toString();
+  useEffect(()=>{const controller=new AbortController();const timer=setTimeout(()=>{api(`/admin/courses?${query}`,{signal:controller.signal}).then(setData).catch(err=>{if(err.name!=='AbortError')setError(err.message);});},250);return()=>{clearTimeout(timer);controller.abort();};},[query,refresh]);
+  useEffect(()=>{api('/admin/merge-history').then(r=>setHistory(r.history)).catch(err=>setError(err.message));},[refresh]);
+  function pick(c){if(selected.some(x=>x.course_id===c.course_id))setSelected(prev=>prev.filter(x=>x.course_id!==c.course_id));else if(selected.length<21)setSelected(prev=>[...prev,c]);else setError('รวมได้สูงสุด 21 รายการต่อครั้ง');}
+  function start(nextMode,c){setMode(nextMode);setPrimary(c.course_id);setForm(coursePayload(c));setPreview(null);setKeep([]);setKeepReviews([]);setAcceptOverage(false);setReason('');setError('');setMessage('');}
+  function editForm(next){setForm(next);setPreview(null);}
+  function mergeBody(){return {primary_course_id:primary,source_course_ids:selected.filter(c=>c.course_id!==primary).map(c=>c.course_id),final_course:numericPayload(form),reason:reason.trim(),keep_plan_item_ids:keep,keep_review_ids:keepReviews,accept_file_overage:acceptOverage};}
+  async function save(e){e.preventDefault();setBusy(true);setError('');setMessage('');try{
+    if(!form.instructor_ids.length)throw new Error('เลือกผู้สอนอย่างน้อยหนึ่งคน');
+    if(mode==='edit'){await api(`/admin/courses/${primary}`,{method:'PUT',body:numericPayload(form)});setMode(null);setSelected([]);setRefresh(x=>x+1);setMessage('บันทึกข้อมูลวิชาแล้ว');}
+    else{const result=await api('/admin/courses/merge/preview',{method:'POST',body:mergeBody()});setPreview(result);setRequestId(crypto.randomUUID());}
+  }catch(err){setError(err.message);}finally{setBusy(false);}}
+  async function confirm(){if(!window.confirm('ยืนยันรวมรายการตามข้อมูลที่ตรวจแล้ว? รายการต้นทางจะพาไปยังรายการหลัก และการย้อนกลับต้องใช้ประวัติ/สำเนาสำรอง'))return;setBusy(true);setError('');try{
+    const result=await api('/admin/courses/merge',{method:'POST',body:{...mergeBody(),preview_token:preview.preview_token,request_id:requestId}});
+    setMessage(`รวมสำเร็จ รายการหลัก #${result.course_id} · ประวัติ #${result.merge_id}`);setMode(null);setSelected([]);setRefresh(x=>x+1);
+  }catch(err){setError(err.message);}finally{setBusy(false);}}
+  async function status(c){if(!window.confirm(`${c.is_active?'ปิด':'เปิด'}แสดงวิชานี้? การปิดจะซ่อนเนื้อหาที่อยู่ภายในจากหน้าสาธารณะด้วย`))return;setBusy(true);try{await api(`/admin/courses/${c.course_id}/status`,{method:'PATCH',body:{is_active:!c.is_active}});setRefresh(x=>x+1);}catch(err){setError(err.message);}finally{setBusy(false);}}
+  const selectedPrimary=selected.find(c=>c.course_id===primary);
+  const planChoicesComplete=preview?.plan_conflicts.every(c=>c.item_ids.filter(id=>keep.includes(id)).length===1);
+  const reviewChoicesComplete=preview?.review_conflicts.every(c=>c.reviews.filter(r=>keepReviews.includes(r.review_id)).length===1);
+  return <section><h1>จัดการข้อมูลรายวิชา</h1><p className="cc-info">แอดมินแก้ข้อมูลหรือรวมรายการซ้ำเป็นกรณีพิเศษ ไม่ต้องตรวจรีวิวและไฟล์ทีละรายการ เนื้อหาที่ถูกรายงานครบ 5 บัญชีจะถูกซ่อนอัตโนมัติ</p>
+    {(error || optionsError)&&<p className="alert alert-error" role="alert">{error || optionsError}</p>}{message&&<p className="alert alert-success" role="status">{message}</p>}
+    {mode&&options?<form className="card" onSubmit={save}>
+      <h2>{mode==='merge'?'รวมรายการวิชา':'แก้ข้อมูลรายวิชา'} #{primary}</h2>
+      {mode==='merge'&&<><label>รายการหลัก (ใช้ URL นี้ต่อ)<select value={primary} onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));setPrimary(c.course_id);editForm(coursePayload(c));setKeep([]);}}>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} {c.course_code} {c.course_name} ({c.academic_year}/{c.semester})</option>)}</select></label><p>เลือกข้อมูลที่จะเก็บเป็นรายช่อง หรือปรับในฟอร์มด้านล่าง ชุดผู้สอนไม่ถูกรวมอัตโนมัติ</p><div className="cc-form-grid">{Object.entries(FIELD_LABELS).map(([key,label])=><label key={key}>{label}: คัดลอกจาก<select value="" onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));if(c)editForm({...form,[key]:coursePayload(c)[key]});}}><option value="">เลือกต้นทาง</option>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} · {c.course_name}</option>)}</select></label>)}</div></>}
+      <CourseForm key={`${mode}-${primary}`} value={form} onChange={editForm} options={options} initialTeachers={mode==='merge'?selected.flatMap(c=>c.instructors):selectedPrimary?.instructors || []} disabled={busy}/>
+      {mode==='merge'&&<label>เหตุผลที่ควรเป็นรายการเดียวกัน<textarea required minLength={5} maxLength={2000} value={reason} onChange={e=>{setReason(e.target.value);setPreview(null);}}/></label>}
+      <div className="cc-actions"><button disabled={busy}>{busy?'กำลังตรวจสอบ…':mode==='merge'?'ตรวจผลกระทบก่อนรวม':'บันทึกการแก้ไข'}</button><button type="button" className="btn-ghost" disabled={busy} onClick={()=>setMode(null)}>ยกเลิก</button></div>
+      {preview&&<div className="cc-info"><h3>ผลก่อนรวม</h3><p>รีวิว {preview.counts.reviews} · ไฟล์ {preview.counts.files} · รายการในแผน {preview.counts.plans}</p><p>เก็บผลงานและสถานะเดิม ไม่คืน HIDDEN หรือ DELETED กลับมาแสดง</p>{preview.warnings.map((w,i)=><p className="alert alert-error" key={i}>{w}</p>)}
+        {preview.plan_conflicts.map(c=><fieldset key={`${c.plan_id}-${c.academic_year}-${c.semester}`}><legend>แผน #{c.plan_id} ปี {c.academic_year} เทอม {c.semester}: เลือกเก็บหนึ่งรายการ</legend><p>รายการเหล่านี้จะกลายเป็นวิชาเดียวกันในเทอมเดียวกัน เก็บประวัติรายการที่ตัดซ้ำไว้ในบันทึกการรวม</p>{c.item_ids.map(id=><label key={id} style={{display:'block'}}><input type="radio" style={{width:'auto'}} name={`plan-${c.plan_id}-${c.academic_year}-${c.semester}`} checked={keep.includes(id)} onChange={()=>{setKeep(prev=>[...prev.filter(x=>!c.item_ids.includes(x)),id]);setPreview(prev=>({...prev,stale:true}));}}/> เก็บรายการ #{id}</label>)}</fieldset>)}
+        {preview.review_conflicts.map(c=><fieldset key={c.reviewer_id}><legend>บัญชี #{c.reviewer_id} มีรีวิวซ้ำหลังรวม: เลือกหนึ่งรีวิวให้แสดง</legend><p>รีวิวที่ไม่เลือกจะเป็น ARCHIVED เก็บข้อความ คะแนน ไลก์ ความคิดเห็นและรายงานไว้ในประวัติ แต่ไม่แสดงและไม่นับคะแนน/แท็ก</p>{c.reviews.map(r=><label key={r.review_id} style={{display:'block',marginBottom:12}}><input type="radio" style={{width:'auto'}} name={`review-${c.reviewer_id}`} checked={keepReviews.includes(r.review_id)} onChange={()=>{setKeepReviews(prev=>[...prev.filter(id=>!c.reviews.some(x=>x.review_id===id)),r.review_id]);setPreview(prev=>({...prev,stale:true}));}}/> รีวิว #{r.review_id} จากวิชา #{r.course_id} · พึงพอใจ {r.rating_satisfaction}/5<p className="cc-secondary-content">{r.content}</p></label>)}</fieldset>)}
+        {preview.file_overages.length>0&&<div><h4>ไฟล์รวมแล้วเกินโควต้า</h4>{preview.file_overages.map(c=><p key={c.user_id}>บัญชี #{c.user_id} · ใช้อยู่ {c.used} / พักสิทธิ์ {c.held}</p>)}<label><input type="checkbox" style={{width:'auto'}} checked={acceptOverage} onChange={e=>{setAcceptOverage(e.target.checked);setPreview(prev=>({...prev,stale:true}));}}/> ยืนยันเก็บไฟล์เดิมครบ ไม่ลบอัตโนมัติ และงดอัปเพิ่มจนมีช่องว่าง</label></div>}
+        <p>การพักสิทธิ์ที่มีอยู่จะย้ายตามมาวิชาหลัก ไม่ถูกล้างจากการรวม</p>
+        {preview.stale&&<p>ตัวเลือกเปลี่ยนแล้ว กด “ตรวจผลกระทบก่อนรวม” อีกครั้ง</p>}<button type="button" disabled={busy || preview.stale || !planChoicesComplete || !reviewChoicesComplete || (preview.file_overages.length>0&&!acceptOverage)} onClick={confirm}>ยืนยันรวมตามผลตรวจนี้</button>
+      </div>}
+    </form>:<>
+      <div className="cc-form-grid"><label>ค้นหา<input type="search" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/></label><label>รหัสเดียวกันแบบตรงตัว<input value={code} onChange={e=>{setCode(e.target.value);setPage(1);}} placeholder="เช่น 06016301"/></label></div>
+      <CatalogFilters options={options} values={filters} onChange={patch=>{setFilters(prev=>({...prev,...patch}));setPage(1);}}/>
+      <div className="cc-actions"><span>พบ {data.total} รายการ · เลือก {selected.length}</span><button disabled={selected.length<2} onClick={()=>start('merge',selected[0])}>รวมรายการที่เลือก</button><button className="btn-ghost" onClick={()=>setSelected([])}>ล้างที่เลือก</button></div>
+      {data.courses.map(c=><div className="card" key={c.course_id} style={{marginTop:12}}><label><input type="checkbox" style={{width:'auto'}} checked={selected.some(x=>x.course_id===c.course_id)} onChange={()=>pick(c)}/> #{c.course_id} · <strong>{c.course_code} {c.course_name}</strong></label><CourseContext course={c}/><div className="cc-actions"><Link to={`/course/${c.course_id}`}>ดูรายวิชา</Link><span>{c.is_active?'เปิดแสดง':'ปิดแสดง'}</span><button className="btn-ghost" onClick={()=>{setSelected([c]);start('edit',c);}}>แก้ข้อมูล</button><button className="btn-ghost" disabled={busy} onClick={()=>status(c)}>{c.is_active?'ปิดแสดง':'เปิดแสดง'}</button></div></div>)}
+      <div className="cc-pagination"><button disabled={page<=1} onClick={()=>setPage(x=>x-1)}>ก่อนหน้า</button><span>หน้า {page}</span><button disabled={page*50>=data.total} onClick={()=>setPage(x=>x+1)}>ถัดไป</button></div>
     </>}
-    {tab === "curriculums" && <><h2>เพิ่มหลักสูตร</h2><form className="card" onSubmit={saveCurriculum}><div className="row"><Field label="ชื่อหลักสูตร" value={curriculumForm.curriculum_name} onChange={setCurriculum("curriculum_name")} required /><Field label="ปีหลักสูตร" type="number" value={curriculumForm.academic_year} onChange={setCurriculum("academic_year")} required /></div><div className="row"><Field label="ภาควิชา" value={curriculumForm.department} onChange={setCurriculum("department")} required /><Field label="ระดับ" value={curriculumForm.degree_level} onChange={setCurriculum("degree_level")} required /></div><button disabled={busyId !== null}>{busyId === "curriculum-form" ? "กำลังบันทึก…" : "เพิ่มหลักสูตร"}</button></form><h2>หลักสูตรที่ใช้งาน</h2><div className="admin-list">{curriculums.map((c) => <article className="card" key={c.curriculum_id}><strong>{c.curriculum_name} ({c.academic_year})</strong><div className="meta">{c.department} · {c.degree_level}</div></article>)}</div></>}
-    {tab === "import" && <><h2>นำเข้ารายวิชาจาก Excel</h2><p className="muted">อัปโหลด .xlsx สูงสุด 5MB ระบบจะตรวจข้อมูลและแสดง preview ก่อนบันทึกจริง</p><a className="btn btn-ghost" href="/course-import-template.xlsx" download>ดาวน์โหลดไฟล์ตัวอย่าง</a><form className="card import-form" onSubmit={previewImport}><div><label>ไฟล์ Excel (.xlsx)</label><input name="excel_file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required /></div><button disabled={busyId !== null}>{busyId === "import-preview" ? "กำลังตรวจสอบ…" : "ตรวจสอบไฟล์"}</button></form>{importPreview && <div className="card"><h2>ตัวอย่างข้อมูลก่อนนำเข้า</h2><p className={importPreview.invalid_count ? "warn" : "muted"}>ใช้ได้ {importPreview.valid_count} แถว · ผิด {importPreview.invalid_count} แถว</p><div className="import-table-wrap"><table className="import-table"><thead><tr><th>แถว</th><th>วิชา</th><th>หลักสูตร</th><th>ปี/เทอม</th><th>ผลตรวจ</th></tr></thead><tbody>{importPreview.rows.map((row) => <tr key={row.row_number}><td>{row.row_number}</td><td><strong>{row.course_code}</strong><br />{row.course_name}</td><td>{row.curriculum_name} ({row.curriculum_year})</td><td>{row.recommended_year}/{row.recommended_semester}</td><td>{row.errors.length ? <span className="import-error">{row.errors.join(", ")}</span> : row.operation === "skip" ? <span className="import-skip">ข้อมูลตรงกัน — ข้าม</span> : row.operation === "update" ? <span className="import-update">มีอยู่แล้ว — อัปเดต</span> : <span className="import-ok">รายวิชาใหม่ — เพิ่ม</span>}</td></tr>)}</tbody></table></div><div className="admin-actions"><button disabled={busyId !== null || importPreview.invalid_count > 0} onClick={confirmImport}>{busyId === "import-confirm" ? "กำลังนำเข้า…" : `ยืนยันนำเข้า ${importPreview.valid_count} รายการ`}</button>{importPreview.invalid_count > 0 && <span className="muted">แก้ไขแถวที่ผิดใน Excel แล้วอัปโหลดใหม่</span>}</div></div>}</>}
-    {tab === "students" && <StudentImportPanel students={students} preview={studentImportPreview} busyId={busyId} onPreview={previewStudentImport} onConfirm={confirmStudentImport} />}
+    <h2>ประวัติการรวมล่าสุด</h2>{history.length?history.map(h=><p className="card" key={h.merge_id}>#{h.merge_id} · {h.source_course_ids.join(', ')} → <Link to={`/course/${h.primary_course_id}`}>#{h.primary_course_id}</Link> · {h.reason}</p>):<p className="muted">ยังไม่มีการรวมรายวิชา</p>}
   </section>;
 }
-
-function StudentImportPanel({ students, preview, busyId, onPreview, onConfirm }) {
-  const operationLabel = (row) => {
-    if (row.errors.length) return <span className="import-error">{row.errors.join(", ")}</span>;
-    if (row.operation === "skip") return <span className="import-skip">มีสิทธิ์นี้แล้ว — ข้าม</span>;
-    if (row.operation === "create_student") return <span className="import-ok">สร้างบัญชีรอ + เพิ่มสิทธิ์</span>;
-    if (row.operation === "link_existing_user") return <span className="import-update">พบบัญชี Google — ผูกรหัสและเพิ่มสิทธิ์</span>;
-    return <span className="import-ok">เพิ่มสิทธิ์ให้บัญชีเดิม</span>;
-  };
-  return <>
-    <h2>นำเข้าข้อมูลนักศึกษาและสิทธิ์รีวิว</h2>
-    <p className="muted">รองรับ CSV หรือ Excel สูงสุด 5MB ระบบจับคู่บัญชีด้วยอีเมล @kmitl.ac.th และแสดง Preview ก่อนบันทึกจริง</p>
-    <a className="btn btn-ghost" href="/student-enrollment-import-template.csv" download>ดาวน์โหลดไฟล์ CSV ตัวอย่าง</a>
-    <form className="card import-form" onSubmit={onPreview}><div><label>ไฟล์นักศึกษา (.csv หรือ .xlsx)</label><input name="student_file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required /></div><button disabled={busyId !== null}>{busyId === "student-import-preview" ? "กำลังตรวจสอบ…" : "ตรวจสอบไฟล์"}</button></form>
-    {preview && <div className="card"><h2>ตัวอย่างสิทธิ์ก่อนนำเข้า</h2><p className={preview.invalid_count ? "warn" : "muted"}>ใช้ได้ {preview.valid_count} แถว · ผิด {preview.invalid_count} แถว</p><div className="import-table-wrap"><table className="import-table"><thead><tr><th>แถว</th><th>นักศึกษา</th><th>รายวิชา</th><th>ปี/เทอม/ตอน</th><th>ผลตรวจ</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.row_number}><td>{row.row_number}</td><td><strong>{row.student_name || row.student_number}</strong>{row.student_name && <><br />{row.student_number}</>}<br />{row.email}{row.google_linked && <><br /><span className="google-linked">เชื่อม Google แล้ว</span></>}</td><td><strong>{row.course_code}</strong><br />{row.course_name}</td><td>{row.academic_year}/{row.semester}/{row.section}</td><td>{operationLabel(row)}</td></tr>)}</tbody></table></div><div className="admin-actions"><button disabled={busyId !== null || preview.invalid_count > 0} onClick={onConfirm}>{busyId === "student-import-confirm" ? "กำลังนำเข้า…" : `ยืนยันเพิ่มสิทธิ์ ${preview.valid_count} รายการ`}</button>{preview.invalid_count > 0 && <span className="muted">แก้ไขแถวที่ผิดแล้วอัปโหลดใหม่ ระบบจะไม่บันทึกบางส่วน</span>}</div></div>}
-    <h2>นักศึกษาที่มีข้อมูลสิทธิ์รีวิว</h2>
-    {!students.length ? <div className="card empty-state"><p className="muted">ยังไม่มีข้อมูลนักศึกษาที่นำเข้า</p></div> : <div className="admin-list">{students.map((student) => <article className="card student-admin-card" key={student.user_id}><div><strong>{student.student_number}</strong><div>{student.email}</div><div className="meta">{student.username}</div></div><div className="student-admin-status"><span className={student.google_linked ? "status-linked" : "status-waiting"}>{student.google_linked ? "เชื่อม Google แล้ว" : "รอ Login ครั้งแรก"}</span><strong>{student.enrollment_count} วิชา</strong></div></article>)}</div>}
-  </>;
-}
-
-function Reports({ loading, reviews, summary, queueOpen, onToggleQueue, busyId, onAction }) {
-  if (loading) return <p className="muted">Loading queue…</p>;
-  return <>
-    <div className="moderation-summary" aria-label="สรุปการตรวจสอบรีวิว">
-      <div className="summary-card summary-pending"><span>รีวิวที่ต้องตรวจสอบ</span><strong>{summary.pending_count}</strong><small>รายการรอดำเนินการ</small></div>
-      <div className="summary-card summary-reviewed"><span>ตรวจสอบแล้ว</span><strong>{summary.reviewed_count}</strong><small>รายการที่ Admin ตัดสินแล้ว</small></div>
-    </div>
-    <section className="review-queue">
-      <button type="button" className="queue-toggle" onClick={onToggleQueue} aria-expanded={queueOpen}><span>รีวิวที่ต้องตรวจสอบ <span className="queue-count">{reviews.length}</span></span><span className="queue-chevron" aria-hidden="true">{queueOpen ? "⌃" : "⌄"}</span></button>
-      {queueOpen && (!reviews.length ? <div className="card empty-state"><strong>คิวว่าง 🎉</strong><p className="muted">ไม่มีรีวิวที่รอตรวจสอบในขณะนี้</p></div> : <div className="admin-list">{reviews.map((r) => <article className="card admin-card" key={r.review_id}><div className="admin-card-head"><div><span className="badge">{r.course_code}</span><Link to={`/course/${r.course_id}`} className="admin-course">{r.course_name}</Link></div><span className="report-badge">{r.report_count} reports</span></div><blockquote className="admin-quote">{r.content}</blockquote><div className="meta">review #{r.review_id} · โดย {r.reviewer_name} · {r.academic_year}/{r.semester} · sec {r.section}</div><div className="admin-actions"><button className="btn btn-keep" disabled={busyId !== null} onClick={() => onAction(r.review_id, "KEEP")}>{busyId === `review-${r.review_id}` ? "…" : "✓ Keep"}</button><button className="btn btn-delete" disabled={busyId !== null} onClick={() => onAction(r.review_id, "DELETE")}>{busyId === `review-${r.review_id}` ? "…" : "🗑 Delete"}</button></div></article>)}</div>)}
-    </section>
-  </>;
-}
-function ReportedFiles({ loading, files, busyId, onAction }) {
-  if (loading) return <p className="muted">Loading queue…</p>;
-  if (!files.length) return <div className="card empty-state"><strong>คิวไฟล์ว่าง 🎉</strong><p className="muted">ไม่มีไฟล์ที่รอตรวจสอบในขณะนี้</p></div>;
-  return <div className="admin-list">{files.map((file) => <article className="card admin-card" key={file.file_id}>
-    <div className="admin-card-head"><div><span className="badge">{file.course_code}</span><Link to={`/course/${file.course_id}`} className="admin-course">{file.course_name}</Link></div><span className="report-badge">{file.report_count} reports</span></div>
-    <a className="summary-file-name" href={`/api/admin/summary-files/${file.file_id}/download`} download>{file.filename}</a>
-    <div className="meta">file #{file.file_id} · โดย {file.uploader_name} · {file.academic_year}/{file.semester} · sec {file.section}</div>
-    <div className="admin-actions"><button className="btn btn-keep" disabled={busyId !== null} onClick={() => onAction(file.file_id, "KEEP")}>{busyId === `file-${file.file_id}` ? "…" : "✓ Keep"}</button><button className="btn btn-delete" disabled={busyId !== null} onClick={() => onAction(file.file_id, "DELETE")}>{busyId === `file-${file.file_id}` ? "…" : "🗑 Delete"}</button></div>
-  </article>)}</div>;
-}
-function CourseList({ courses, busyId, onEdit, onToggle }) { return <div className="admin-list">{courses.map((course) => <article className="card course-admin-card" key={course.course_id}><div><span className="badge">{course.course_code}</span><strong>{course.course_name}</strong>{!course.is_active && <span className="status-inactive">ซ่อนจาก Catalog</span>}<div className="meta">{course.department}</div>{course.instructors?.length > 0 && <div className="meta">ผู้สอน: {course.instructors.join(", ")}</div>}{course.curriculum_mappings?.map((m) => <div className="curriculum-chip" key={m.curriculum_id}>{m.curriculum_name} {m.academic_year} · ปี {m.recommended_year} / เทอม {m.recommended_semester} · {m.requirement_type === "REQUIRED" ? "บังคับ" : "เลือก"}</div>)}{course.tags?.map((tag) => <span className="tag-chip tag-chip-static" key={tag}>{tag}</span>)}</div><div className="admin-actions"><button className="btn btn-ghost" onClick={() => onEdit(course)} disabled={busyId !== null}>แก้ไข</button><button className={course.is_active ? "btn btn-danger-outline" : "btn btn-keep"} onClick={() => onToggle(course)} disabled={busyId !== null}>{busyId === `course-${course.course_id}` ? "…" : course.is_active ? "ซ่อนวิชา" : "เปิดใช้"}</button></div></article>)}</div>; }
-function InstructorPicker({ value, options, onChange, onCreate }) {
-  const [query, setQuery] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const selected = new Set(value);
-  const filtered = options.filter((instructor) => instructor.name.toLowerCase().includes(query.trim().toLowerCase()) && !selected.has(instructor.name)).slice(0, 8);
-  function select(name) { onChange([...value, name]); setQuery(""); }
-  function remove(name) { onChange(value.filter((item) => item !== name)); }
-  async function addInstructor() {
-    if (!newName.trim()) return;
-    setBusy(true);
-    try { await onCreate(newName.trim()); setNewName(""); setAdding(false); } catch (err) { window.alert(err.message); } finally { setBusy(false); }
-  }
-  return <div className="instructor-picker"><label>อาจารย์ผู้สอน</label><div className="instructor-input-wrap">{value.map((name) => <span className="instructor-chip" key={name}>{name}<button type="button" aria-label={`ลบ ${name}`} onClick={() => remove(name)}>×</button></span>)}<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={value.length ? "ค้นหาเพิ่ม…" : "พิมพ์เพื่อค้นหาอาจารย์…"} /></div>{query.trim() && <div className="instructor-options">{filtered.map((instructor) => <button type="button" key={instructor.instructor_id} onClick={() => select(instructor.name)}>{instructor.name}</button>)}{!filtered.length && <span className="instructor-no-result">ไม่พบอาจารย์ชื่อนี้</span>}</div>}<button type="button" className="btn btn-ghost instructor-add-toggle" onClick={() => setAdding((open) => !open)}>＋ เพิ่มอาจารย์ใหม่</button>{adding && <div className="instructor-add-form"><input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="ชื่ออาจารย์" maxLength="255" required /><button type="button" onClick={addInstructor} disabled={busy}>{busy ? "กำลังเพิ่ม…" : "เพิ่มและเลือก"}</button></div>}<small className="muted">เลือกได้หลายคน · ค้นหาจากรายชื่อที่มีอยู่</small></div>; }
-function Field({ label, value, onChange, type = "text", required = false }) { return <div><label>{label}</label><input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} min={type === "number" ? 1 : undefined} /></div>; }
-function TextField({ label, value, onChange }) { return <div><label>{label}</label><textarea rows="2" value={value ?? ""} onChange={(e) => onChange(e.target.value)} /></div>; }
-function Select({ label, value, onChange, children }) { return <div><label>{label}</label><select value={value} onChange={(e) => onChange(e.target.value)}>{children}</select></div>; }

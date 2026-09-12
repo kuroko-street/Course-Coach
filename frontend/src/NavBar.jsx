@@ -1,64 +1,16 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "./AuthContext.jsx";
+import {useState} from 'react';
+import {Link,NavLink,useNavigate} from 'react-router-dom';
+import {useAuth} from './AuthContext.jsx';
+import Avatar from './Avatar.jsx';
+import ActionMenu from './components/ActionMenu.jsx';
 
-/**
- * Top navigation. Always shows who the current user is, and gives a one-click
- * route to the login screen for switching characters mid-demo. The Admin link
- * only appears for ADMIN accounts (the route is guarded regardless).
- */
-export default function NavBar() {
-  const { user, isAdmin, logout } = useAuth();
-  const navigate = useNavigate();
-
-  async function handleLogout() {
-    await logout();
-    navigate("/login", { replace: true });
-  }
-
-  return (
-    <header className="navbar">
-      <div className="navbar-inner">
-        <Link to="/" className="brand">
-          Course&nbsp;Coach
-        </Link>
-
-        <nav className="nav-links">
-          <NavLink to="/" end className="nav-link">
-            Catalog
-          </NavLink>
-          <NavLink to="/dashboard" className="nav-link">
-            Dashboard
-          </NavLink>
-          <NavLink to="/plans" className="nav-link">
-            แผนการเรียน
-          </NavLink>
-          {isAdmin && (
-            <NavLink to="/admin" className="nav-link">
-              Admin Queue
-            </NavLink>
-          )}
-        </nav>
-
-        <div className="nav-user">
-          {user ? (
-            <>
-              <Link to={`/profile/${user.user_id}`} className="nav-username">
-                {user.display_name}
-                <span className={`role-pill role-${user.role.toLowerCase()}`}>
-                  {user.role}
-                </span>
-              </Link>
-              <button type="button" className="btn btn-ghost" onClick={handleLogout}>
-                ออกจากระบบ
-              </button>
-            </>
-          ) : (
-            <Link to="/login" className="btn btn-ghost">
-              Log in
-            </Link>
-          )}
-        </div>
-      </div>
-    </header>
-  );
+export default function NavBar(){
+  const {user,authReady,isAdmin,logout}=useAuth();const navigate=useNavigate();
+  const [error,setError]=useState(''),[busy,setBusy]=useState(false);
+  async function handleLogout(){setBusy(true);try{await logout();navigate('/login',{replace:true});}catch(e){setError(e.message);}finally{setBusy(false);}}
+  return <header className="navbar ux-navbar"><a className="ux-skip" href="#main-content">ข้ามไปเนื้อหา</a><div className="navbar-inner">
+    <Link to="/" className="brand"><span className="ux-brand-mark" aria-hidden="true">C</span>Course Coach</Link>
+    <nav className="nav-links" aria-label="เมนูหลัก"><NavLink to="/" end className="nav-link">รายวิชา</NavLink><NavLink to="/dashboard" className="nav-link">อันดับรายวิชา</NavLink><NavLink to="/plans" className="nav-link">แผนการเรียน</NavLink>{isAdmin&&<NavLink to="/admin" className="nav-link">จัดการรายวิชา</NavLink>}</nav>
+    <div className="nav-user">{!authReady?<span className="ux-auth-placeholder" aria-label="กำลังตรวจสอบบัญชี"/>:user?<ActionMenu label="เมนูบัญชีของฉัน" className="ux-account-menu" trigger={<><Avatar url={user.avatar_url} size={30}/><span className="ux-account-name">{user.display_name}</span><span aria-hidden="true">⌄</span></>}><Link to={`/profile/${user.user_id}`}>โปรไฟล์ของฉัน</Link><button disabled={busy} type="button" onClick={handleLogout}>ออกจากระบบ</button></ActionMenu>:<Link to="/login" className="btn btn-ghost">เข้าสู่ระบบ</Link>}</div>
+  </div>{error&&<p role="alert" className="alert alert-error">{error}</p>}</header>;
 }

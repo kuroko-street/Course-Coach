@@ -55,27 +55,28 @@ export function StarDisplay({ value }) {
   );
 }
 
-function LikertInput({ field, label, value, onChange }) {
+function LikertInput({ field, label, value, onChange, invalid }) {
   return (
-    <fieldset className="likert-question">
+    <fieldset className={`likert-question ${invalid ? 'ux-field-invalid' : ''}`} data-rating-field={field} aria-describedby={invalid ? `rating-error-${field}` : undefined}>
       <legend>{label}</legend>
       <div className="likert-options">
         {LIKERT_OPTIONS.map((option) => (
           <label className={`likert-option ${value === option.value ? "selected" : ""}`} key={option.value}>
-            <input type="radio" name={`rating-${field}`} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} />
+            <input type="radio" name={`rating-${field}`} aria-label={`${option.value} ${option.label}`} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} />
             <span className="likert-radio" aria-hidden="true" />
             <span>{option.value}</span>
           </label>
         ))}
       </div>
+      {invalid && <p id={`rating-error-${field}`} className="ux-field-error">กรุณาเลือกคะแนนด้านนี้</p>}
     </fieldset>
   );
 }
 
-export function RatingBreakdown({ ratings }) {
+export function RatingBreakdown({ ratings, excludeSatisfaction = false }) {
   return (
     <div className="rating-breakdown">
-      {RATING_FIELDS.map((field) => (
+      {RATING_FIELDS.filter(field => !excludeSatisfaction || field !== 'satisfaction').map((field) => (
         <div className="rating-row" key={field}>
           <span className="rating-label">{RATING_LABELS[field]}</span>
           <StarDisplay value={ratings[field]} />
@@ -85,7 +86,7 @@ export function RatingBreakdown({ ratings }) {
   );
 }
 
-export function RatingForm({ ratings, onChange }) {
+export function RatingForm({ ratings, onChange, missing = [] }) {
   return (
     <div className="likert-form">
       <div className="likert-scale" aria-label="ความหมายของคะแนน">
@@ -94,7 +95,7 @@ export function RatingForm({ ratings, onChange }) {
         ))}
       </div>
       {RATING_FIELDS.map((field) => (
-        <LikertInput key={field} field={field} label={RATING_LABELS[field]} value={ratings[field]} onChange={(score) => onChange({ ...ratings, [field]: score })} />
+        <LikertInput key={field} field={field} label={RATING_LABELS[field]} value={ratings[field]} invalid={missing.includes(field)} onChange={(score) => onChange({ ...ratings, [field]: score })} />
       ))}
     </div>
   );
