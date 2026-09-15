@@ -2,10 +2,10 @@
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Thai",
     sans-serif;
   color: #1a1a1a;
-  background: #f4f5f7;
+  background: #f9f5f2;
 
-  --brand: #3949ab;
-  --brand-soft: #eef2ff;
+  --brand: #c2410c;
+  --brand-soft: #fef5ef;
   --border: #e3e5e8;
   --muted: #777;
   --danger: #b71c1c;
@@ -133,8 +133,8 @@ section {
 }
 
 .role-student {
-  background: #e3f2fd;
-  color: #0d47a1;
+  background: #fdede3;
+  color: #c2410c;
 }
 
 .role-admin {
@@ -311,7 +311,7 @@ button:disabled,
 
 .user-card-current {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(57, 73, 171, 0.12);
+  box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.16);
 }
 
 .user-card strong {
@@ -388,7 +388,7 @@ button:disabled,
 .department-select:focus {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(57, 73, 171, 0.12);
+  box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.16);
 }
 
 /* ---- Course catalog grid ---- */
@@ -936,7 +936,7 @@ a.tag-chip:hover,
   padding: 12px 14px;
   margin: 14px 0 4px;
   border-radius: 10px;
-  background: #f5f6f8;
+  background: #f9f6f4;
   color: #4e535b;
   font-size: 12px;
 }
@@ -972,7 +972,7 @@ a.tag-chip:hover,
   gap: 4px;
   min-height: 62px;
   margin: 0;
-  border: 1px solid #d9dde4;
+  border: 1px solid #eadcd3;
   border-radius: 9px;
   background: #fff;
   cursor: pointer;
@@ -997,17 +997,17 @@ a.tag-chip:hover,
 }
 
 .likert-option.selected {
-  border-color: #3455d1;
-  background: #f2f5ff;
-  color: #2948bf;
+  border-color: #c2410c;
+  background: #fef7f3;
+  color: #c2410c;
 }
 
 .likert-option.selected .likert-radio {
-  border: 5px solid #3b55bf;
+  border: 5px solid #c2410c;
 }
 
 .likert-option:focus-within {
-  outline: 2px solid rgba(52, 85, 209, 0.25);
+  outline: 2px solid rgba(194, 65, 12, 0.25);
   outline-offset: 2px;
 }
 
@@ -1521,7 +1521,7 @@ a.tag-chip:hover,
   padding: 10px 12px;
   border: 1px solid var(--brand);
   border-radius: 8px;
-  background: #f4f6fd;
+  background: #fdf8f4;
   margin-bottom: 12px;
 }
 
@@ -1606,10 +1606,10 @@ a.tag-chip:hover,
 }
 .contribution-unavailable strong { color: #262626; font-size: 15px; }
 .contribution-unavailable p { margin: 0; font-size: 12px; }
-.contribution-file { border-color: #1478d4; background: #f7fbff; }
-.contribution-file strong { color: #0568c8; }
+.contribution-file { border-color: #c2410c; background: #fefaf8; }
+.contribution-file strong { color: #c2410c; }
 .contribution-review-button { background: #dc5151; border-color: #dc5151; white-space: nowrap; }
-.contribution-file-button { background: #0872d5; border-color: #0872d5; white-space: nowrap; }
+.contribution-file-button { background: #c2410c; border-color: #c2410c; white-space: nowrap; }
 
 .course-content-tabs {
   display: flex;
@@ -1631,7 +1631,7 @@ a.tag-chip:hover,
   cursor: pointer;
 }
 
-.course-tab.active { color: #086cc9; border-bottom-color: #086cc9; }
+.course-tab.active { color: #c2410c; border-bottom-color: #c2410c; }
 .course-see-more { margin-left: auto; white-space: nowrap; }
 .course-tab-panel { display: grid; gap: 14px; padding-top: 24px; }
 
@@ -1655,7 +1655,7 @@ a.tag-chip:hover,
 .summary-file-card { display: grid; gap: 16px; }
 .summary-file-main { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
 .summary-file-icon { font-size: 32px; }
-.summary-file-name { display: inline-block; color: #0568c8; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.summary-file-name { display: inline-block; color: #c2410c; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
 .summary-file-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
 .summary-file-uploader { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--muted); font-size: 13px; }
 .summary-file-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1664,7 +1664,7 @@ a.tag-chip:hover,
 .review-sort-control { min-width: 210px; }
 .summary-year-groups { display: grid; gap: 26px; }
 .summary-year-heading { margin-bottom: 10px; }
-.count-pill { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #eaf4ff; color: #0568c8; font-size: 13px; }
+.count-pill { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #fdf3ec; color: #c2410c; font-size: 13px; }
 
 @media (max-width: 700px) {
   .contribution-grid { grid-template-columns: 1fr; }

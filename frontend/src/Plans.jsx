@@ -76,7 +76,7 @@ export default function Plans() {
   }
 
   return (
-    <section>
+    <section className="plans-page">
       <h1>แผนการเรียนของฉัน</h1>
       <p className="muted">
         วางแผนวิชาและหน่วยกิตล่วงหน้าก่อนลงทะเบียนเรียนจริง
@@ -85,15 +85,15 @@ export default function Plans() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="plan-create-form">
-        <button type="button" onClick={handleCreate} disabled={creating}>
+        <button className="btn-primary" type="button" onClick={handleCreate} disabled={creating}>
           {creating ? "กำลังสร้าง…" : "+ สร้างแผน"}
         </button>
       </div>
 
       {loading ? (
-        <p className="muted">Loading…</p>
+        <p className="muted">กำลังโหลดแผนการเรียน…</p>
       ) : plans.length === 0 ? (
-        <p className="muted">ยังไม่มีแผนการเรียน — สร้างแผนแรกของคุณด้านบน</p>
+        <div className="profile-empty"><h2>เริ่มวางแผนเทอมถัดไป</h2><p className="muted">กด “สร้างแผน” เพื่อเลือกวิชาและดูหน่วยกิตรวมของคุณ</p></div>
       ) : (
         <div className="plan-list" style={{ marginTop: 16 }}>
           {plans.map((p) => (

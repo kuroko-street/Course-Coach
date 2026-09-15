@@ -10,6 +10,8 @@ x-app-env: &app-env
   DB_PASSWORD: coursecoach_local_only
   APP_ENV: development
   WATCHFILES_FORCE_POLLING: "true"
+  FILE_STORAGE: ${FILE_STORAGE:-local}
+  CLOUDINARY_URL: ${CLOUDINARY_URL:-}
   UPLOADS_DIR: /data/uploads
   AVATARS_DIR: /data/avatars
   ALLOW_MOCK_AUTH: ${COMMUNITY_MOCK_AUTH:-true}

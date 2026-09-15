@@ -30,3 +30,4 @@ export async function apiUploadMany(path, { files = [], fields = {}, signal } = 
   return unwrap(await fetch(`/api${path}`, { method: "POST", credentials: "include", body: form, signal }));
 }
 export function summaryFileDownloadUrl(fileId) { return `/api/summary-files/${fileId}/download`; }
+export function summaryFilePreviewUrl(fileId) { return `/api/summary-files/${fileId}/preview`; }

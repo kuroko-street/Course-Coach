@@ -1,4 +1,5 @@
 import asyncio
+from services import cloud_storage
 from pathlib import Path
 import uuid
 import zipfile
@@ -15,7 +16,7 @@ from repositories.contribution_repository import ContributionRepository
 from services.content_comment_service import ContentCommentService
 
 class SummaryFileService:
-    MAX_FILE_SIZE_BYTES=20*1024*1024
+    MAX_FILE_SIZE_BYTES=10_000_000
     MIME={'.pdf':'application/pdf','.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png',
           '.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           '.pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -66,7 +67,7 @@ class SummaryFileService:
     async def upload(self,course_id,user,uploads,ip_address=None,upload_request_id=None):
         if not uploads: raise ServiceError(422,'กรุณาเลือกไฟล์')
         request_id=str(upload_request_id or uuid.uuid4())
-        conn=self.connection_factory(); stored=[]
+        conn=self.connection_factory(); stored=[]; remote=[]
         try:
             self.quotas.lock(conn,course_id,user['user_id'])
             if not ReviewRepository().course_exists(conn,course_id): raise ServiceError(404,'ไม่พบรายวิชา')
@@ -91,22 +92,29 @@ class SummaryFileService:
                 with path.open('xb') as destination:
                     while chunk:=await upload.read(1024*1024):
                         size+=len(chunk)
-                        if size>self.MAX_FILE_SIZE_BYTES: raise ServiceError(413,'ไฟล์ต้องไม่เกิน 20 MB (20,971,520 bytes)')
+                        if size>self.MAX_FILE_SIZE_BYTES: raise ServiceError(413,'ไฟล์ต้องไม่เกิน 10 MB (10,000,000 bytes)')
                         destination.write(chunk)
                 if not size: raise ServiceError(422,'ไฟล์ว่าง')
                 await asyncio.to_thread(self.validate_file,path,extension)
+                reference=str(path)
+                if cloud_storage.enabled():
+                    reference=await asyncio.to_thread(cloud_storage.save,path)
+                    remote.append(reference)
                 with dict_cursor(conn) as cur:
-                    cur.execute('INSERT INTO summary_files(upload_batch_id,filename,stored_path,mime_type,size_bytes) VALUES(%s,%s,%s,%s,%s) RETURNING file_id,filename,size_bytes,status',(batch_id,filename,str(path),self.MIME[extension],size))
+                    cur.execute('INSERT INTO summary_files(upload_batch_id,filename,stored_path,mime_type,size_bytes) VALUES(%s,%s,%s,%s,%s) RETURNING file_id,filename,size_bytes,status',(batch_id,filename,reference,self.MIME[extension],size))
                     file=cur.fetchone(); result.append(file)
                     self.audit.create(conn,user['user_id'],'UPLOAD_SUMMARY_FILE',file['file_id'],ip_address)
             conn.commit()
             return {'files':result,'upload_batch_id':batch_id}
         except Exception:
             conn.rollback()
+            for reference in remote: await asyncio.to_thread(cloud_storage.remove,reference)
             for path in stored: path.unlink(missing_ok=True)
             raise
         finally:
             conn.close()
+            if remote:
+                for path in stored: path.unlink(missing_ok=True)
             for upload in uploads: await upload.close()
 
     def list_files(self,course_id=None,caller_id=None):
@@ -123,6 +131,8 @@ class SummaryFileService:
         conn=self.connection_factory()
         try: row=self.active(self.files.find(conn,file_id))
         finally: conn.close()
+        if row['stored_path'].startswith(cloud_storage.PREFIX):
+            return cloud_storage.download_url(row['stored_path']),row['filename'],row['mime_type']
         path=Path(row['stored_path']).resolve()
         if not path.is_relative_to(self.uploads_dir) or not path.is_file(): raise ServiceError(404,'ไม่พบไฟล์ต้นฉบับ')
         return path,row['filename'],row['mime_type']

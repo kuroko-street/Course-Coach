@@ -5,6 +5,8 @@ import { AuthProvider } from "./AuthContext.jsx";
 import App from "./App.jsx";
 import "./index.css";
 import "./ux.css";
+import "./course-coach-theme.css";
+import "./file-preview.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
