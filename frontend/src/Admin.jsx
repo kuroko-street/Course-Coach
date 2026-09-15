@@ -1,13 +1,14 @@
 import {useEffect,useState} from 'react';
-import {Link} from 'react-router-dom';
+import {Link,useSearchParams} from 'react-router-dom';
 import {api} from './api.js';
 import CourseForm,{coursePayload,numericPayload} from './components/CourseForm.jsx';
 import {CatalogFilters,CourseContext,useCatalogOptions} from './components/CourseUI.jsx';
 
 const FIELD_LABELS={course_code:'รหัส',course_name:'ชื่อวิชา',faculty_id:'คณะ',department_id:'สาขา',academic_year:'ปี',semester:'เทอม',credits:'หน่วยกิต',instructor_ids:'ชุดผู้สอน',syllabus:'คำอธิบาย',additional_details:'รายละเอียดเพิ่มเติม'};
 export default function Admin(){
+  const [searchParams]=useSearchParams();
   const {options,error:optionsError}=useCatalogOptions();
-  const [filters,setFilters]=useState({});const [search,setSearch]=useState('');const [code,setCode]=useState('');const [page,setPage]=useState(1);
+  const [filters,setFilters]=useState({});const [search,setSearch]=useState('');const [code,setCode]=useState(searchParams.get('code') || '');const [page,setPage]=useState(1);
   const [data,setData]=useState({courses:[],total:0});const [selected,setSelected]=useState([]);const [mode,setMode]=useState(null);
   const [primary,setPrimary]=useState(null);const [form,setForm]=useState(coursePayload());const [reason,setReason]=useState('');const [keep,setKeep]=useState([]);
   const [preview,setPreview]=useState(null);const [requestId,setRequestId]=useState('');const [history,setHistory]=useState([]);

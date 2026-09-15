@@ -1,4 +1,7 @@
 import mimetypes
+import asyncio
+from PIL import Image
+from services import cloud_storage
 import uuid
 from pathlib import Path
 
@@ -126,21 +129,39 @@ class UserService:
             stored_path.unlink(missing_ok=True)
             raise
 
-        for existing_file in user_dir.iterdir():
-            if existing_file != stored_path:
-                existing_file.unlink(missing_ok=True)
+        try:
+            with Image.open(stored_path) as image:
+                expected = {'.jpg': 'JPEG', '.png': 'PNG', '.webp': 'WEBP'}[extension]
+                if image.format != expected:
+                    raise ValueError('Image format mismatch')
+                image.verify()
+        except Exception as exc:
+            stored_path.unlink(missing_ok=True)
+            raise ServiceError(422, 'Invalid avatar image.') from exc
 
-        conn = self.connection_factory()
+        conn = None
+        remote_id = None
         try:
             avatar_url = f"/api/users/{user['user_id']}/avatar?v={uuid.uuid4().hex[:8]}"
+            if cloud_storage.enabled():
+                avatar_url, remote_id = await asyncio.to_thread(cloud_storage.save, stored_path, avatar=True)
+            conn = self.connection_factory()
             updated = self.users.update_avatar_url(conn, user["user_id"], avatar_url)
             conn.commit()
-            return {"user": updated, "message": "Avatar updated."}
         except Exception:
-            conn.rollback()
+            if conn is not None:
+                conn.rollback()
+            if remote_id:
+                await asyncio.to_thread(cloud_storage.remove_avatar, remote_id)
+            stored_path.unlink(missing_ok=True)
             raise
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
+        for existing_file in user_dir.iterdir():
+            if remote_id or existing_file != stored_path:
+                existing_file.unlink(missing_ok=True)
+        return {"user": updated, "message": "Avatar updated."}
 
     def get_avatar_path(self, user_id):
         user_dir = self.avatars_dir / str(user_id)

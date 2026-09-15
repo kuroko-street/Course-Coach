@@ -10,6 +10,11 @@ from db import get_connection,dict_cursor
 router=APIRouter(prefix='/api',tags=['admin'])
 catalog=CatalogService()
 courses=CourseService()
+@router.get('/admin/dashboard')
+def dashboard(admin:dict=Depends(require_admin)):
+    from services.admin_dashboard_service import dashboard as load_dashboard
+    return invoke(load_dashboard)
+
 class CourseStatus(BaseModel):
     model_config=ConfigDict(extra='forbid')
     is_active:bool

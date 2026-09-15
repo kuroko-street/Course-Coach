@@ -3,12 +3,13 @@ import asyncio
 from pathlib import Path
 from uuid import UUID
 from fastapi import APIRouter,Depends,File,Form,UploadFile,HTTPException,Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse,RedirectResponse,Response
 from api.dependencies import require_user,optional_user_id
 from api.course_routes import invoke
 from domain.errors import ServiceError
 from schemas.summary_file import SummaryFileCommentCreate
 from services.summary_file_service import SummaryFileService
+from services.summary_file_preview import preview_png
 
 router=APIRouter(prefix='/api',tags=['summary-files'])
 service=SummaryFileService(Path(os.getenv('UPLOADS_DIR','/app/uploads')))
@@ -25,7 +26,16 @@ def all_files(caller_id:int|None=Depends(optional_user_id)): return invoke(servi
 @router.get('/summary-files/{file_id}/download')
 def download(file_id:int,user:dict=Depends(require_user)):
     path,name,mime=invoke(service.get_download,file_id)
+    if isinstance(path,str):
+        return RedirectResponse(path,status_code=307,headers={'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'})
     return FileResponse(path,filename=name,media_type=mime,headers={'X-Content-Type-Options':'nosniff','Cache-Control':'private, no-store'})
+@router.get('/summary-files/{file_id}/preview')
+def preview(file_id:int,user:dict=Depends(require_user)):
+    path,name,mime=invoke(service.get_download,file_id)
+    return Response(invoke(preview_png,path,mime),media_type='image/png',headers={
+        'X-Content-Type-Options':'nosniff','Cache-Control':'private, no-store',
+        'Content-Security-Policy':"default-src 'none'; sandbox",
+    })
 @router.post('/summary-files/{file_id}/like')
 def like(file_id:int,user:dict=Depends(require_user)): return invoke(service.toggle_like,file_id,user)
 @router.get('/summary-files/{file_id}/comments')

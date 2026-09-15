@@ -6,6 +6,7 @@ import Home from "./Home.jsx";
 import CourseCreate from "./CourseCreate.jsx";
 import CourseDetail from "./CourseDetail.jsx";
 import Admin from "./Admin.jsx";
+import AdminDashboard from "./AdminDashboard.jsx";
 import Dashboard from "./Dashboard.jsx";
 import Profile from "./Profile.jsx";
 import Instructor from "./Instructor.jsx";
@@ -37,6 +38,7 @@ export default function App() {
     <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
     <Route path="/plans/:id" element={<RequireAuth><PlanDetail /></RequireAuth>} />
     <Route path="/admin" element={<RequireAuth admin><Admin /></RequireAuth>} />
+    <Route path="/admin/dashboard" element={<RequireAuth admin><AdminDashboard /></RequireAuth>} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></main></>;
 }

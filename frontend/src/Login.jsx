@@ -171,8 +171,8 @@ export default function Login() {
                 onClick={() => handleMockLogin(candidate)}
               >
                 <Avatar url={candidate.avatar_url} size={40} />
-                <strong>{candidate.username}</strong>
-                <span className="muted small">{candidate.email}</span>
+                <strong>{candidate.display_name || candidate.username}</strong>
+                <span className="muted small">{candidate.role === "ADMIN" ? "ผู้ดูแลระบบ" : "นักศึกษา"}</span>
                 <div className="user-card-cta">
                   {mockPendingId === candidate.user_id ? "กำลังเข้าสู่ระบบ…" : `เข้าใช้ในสิทธิ์ ${candidate.role}`}
                 </div>

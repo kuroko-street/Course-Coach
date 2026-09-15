@@ -1,0 +1,127 @@
+/* Course Coach: orange actions, neutral reading surfaces, Thai-first typography.
+   Preserve the existing 1120px shell and responsive card layout. */
+:root {
+  --brand: #ff5a00;
+  --brand-soft: #fff0e5;
+  --ink: #20252b;
+  --muted: #606873;
+  --border: #e3e6e9;
+  --action-text: #a93600;
+  font-family: "Leelawadee UI", "Noto Sans Thai", Tahoma, system-ui, sans-serif;
+  color: var(--ink);
+  background: #f6f7f8;
+}
+body { line-height: 1.7; }
+h1,h2,h3 { color: var(--ink); letter-spacing: 0; }
+h1 { font-weight: 700; }
+a { color: var(--action-text); }
+label,.btn-ghost,.cc-context,.ux-term-pill,.ux-menu>summary { color: #454d57; }
+.muted,.meta,.ad-stat small,.ad-empty { color: var(--muted); }
+.card { border-color: var(--border); box-shadow: 0 2px 6px #20252b08; }
+.ux-navbar { border-bottom: 1px solid var(--border); }
+.ux-navbar .brand { color: var(--ink); }
+.ux-brand-mark,.login-mark { background: var(--brand); color: #fff; }
+.ux-navbar .nav-link.active { background: var(--brand-soft); color: var(--action-text); font-weight: 700; }
+.ux-menu[open]>summary { border-color: #ffba91; background: var(--brand-soft); }
+.ux-menu-panel>:hover { background: #f4f5f6; }
+.btn-ghost { border-color: var(--border); }
+.btn-ghost:hover:not(:disabled) { border-color: #ffba91; background: #fff6ef; }
+
+:where(input,select,textarea) { border-color: #cbd1d7; color: var(--ink); background-color: #fff; }
+:where(input,select,textarea):focus { border-color: var(--brand); box-shadow: 0 0 0 3px #ff5a0018; }
+:where(a,button,input,select,textarea,summary):focus-visible { outline: 2px solid #a93600; outline-offset: 3px; }
+.ux-page-heading { margin-bottom: 24px; }
+.ux-page-heading p { max-width: 65ch; color: var(--muted); }
+.ux-search-box input { border: 1px solid #bbc3cc; border-left: 4px solid var(--brand); }
+.ux-filter-chip,.tag-chip-button[aria-pressed=true],.cc-selected-teachers button { background: var(--brand-soft); color: var(--action-text); border-color: #ffba91; }
+.ux-term-pill,.tag-chip-static { background: #f1f3f5; color: #4a535d; }
+.ux-course-card { border: 1px solid var(--border); }
+.ux-course-card:hover { border-color: var(--brand); box-shadow: 0 3px 12px #20252b0c; }
+.ux-card-code { color: var(--action-text); font-variant-numeric: tabular-nums; }
+.ux-course-card .ux-card-title { color: var(--ink); font-size: 19px; line-height: 1.65; }
+.ux-course-card .meta { line-height: 1.75; }
+.ux-course-card .ux-card-footer { border-color: var(--border); }
+.cc-info { background: #fff6ef; border-left-color: var(--brand); color: #61442d; }
+.ux-empty,.ad-empty { background: #f6f7f8; }
+.ad-stat { border-top-color: var(--brand); }
+.ad-stat strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.ad-list li { border-color: var(--border); }
+.ad-badge { color: var(--action-text); background: var(--brand-soft); }
+.google-login-card { border-top: 3px solid var(--brand); }
+.google-login-card h1 { font-size: 25px; }
+.login-domain { color: var(--action-text); }
+.login-privacy { border-top: 1px solid var(--border); padding-top: 16px; }
+.user-card strong { overflow-wrap: anywhere; }
+.user-card:focus-visible { outline: 2px solid #a93600; }
+@media(max-width:650px) {
+  body { font-size: 15px; }
+  .google-login-card { padding: 24px 16px; }
+  .google-login-card h1 { font-size: 22px; }
+  .ux-course-card .ux-card-title { font-size: 18px; }
+  .mock-login-card { padding: 20px 16px; }
+}
+
+/* Keep primary navigation labels easy to scan. */
+.ux-navbar .nav-link { font-weight: 700; }
+/* Vivid orange actions with high-contrast dark labels. */
+:root { --action-bg: #ff5a00; --muted: #535e6b; }
+button:not([class]),button.btn-primary,a.btn:not(.btn-ghost),.user-card-cta {
+  background: var(--action-bg); color: #291307; font-weight: 700;
+}
+button.btn-primary { padding: 11px 20px; border-radius: 8px; min-height: 44px; }
+button:not([class]):hover:not(:disabled),button.btn-primary:hover:not(:disabled),a.btn:not(.btn-ghost):hover {
+  background: #f45100; color: #291307; filter: none;
+}
+button:disabled { opacity: 1; background: #e5e7eb; color: #59616c; }
+.back-link,.ux-link-button,.ux-filter-advanced>summary,.cc-advanced summary { color: #a93600; font-weight: 600; }
+.muted,.meta,.small,.ad-stat small { color: var(--muted); }
+button,.btn { font-size: 14px; letter-spacing: 0; }
+.profile-header { gap: 18px; align-items: center; margin: 6px 0 26px; }
+.profile-header h1 { margin: 0; }
+.profile-header p { margin: 5px 0 0; }
+.profile-settings { padding: 28px; }
+.profile-settings>p { margin-bottom: 24px; }
+.profile-name-form { max-width: 640px; display: grid; gap: 10px; }
+.profile-name-form label,.profile-avatar-field { font-weight: 600; }
+.profile-name-form input { width: 100%; }
+.profile-name-form p { margin: 0; }
+.profile-name-form button { justify-self: start; margin-top: 6px; }
+.profile-avatar-field { display: grid; gap: 10px; border-top: 1px solid var(--border); margin-top: 26px; padding-top: 24px; }
+.profile-avatar-field span { font-weight: 400; }
+.profile-avatar-field input { max-width: 640px; min-width: 0; width: 100%; font-size: 14px; padding: 8px; }
+.profile-avatar-field input::file-selector-button { background: #f1f3f5; color: #303944; border: 1px solid #cbd1d7; border-radius: 6px; padding: 8px 12px; margin-right: 12px; font: inherit; cursor: pointer; }
+.profile-stats { display: flex; gap: 40px; padding: 24px 0; margin: 6px 0 12px; border-bottom: 1px solid var(--border); }
+.profile-stats>div { display: flex; align-items: baseline; gap: 10px; }
+.profile-stats strong { font-size: 26px; color: var(--ink); }
+.profile-stats span { font-size: 14px; color: var(--muted); }
+.profile-empty { margin-top: 16px; padding: 32px; background: #fff; border: 1px dashed #cbd1d7; border-radius: 12px; }
+.profile-empty h3,.profile-empty h2 { margin: 0 0 8px; font-size: 18px; }
+.profile-empty p { margin: 0 0 18px; }
+.plans-page .plan-create-form { margin: 22px 0; }
+@media(max-width:650px) {
+  .profile-settings { padding: 20px; }
+  .profile-header h1 { overflow-wrap: anywhere; }
+  .profile-header>div { min-width: 0; }
+  .profile-stats { gap: 24px; flex-wrap: wrap; }
+  .profile-stats>div { flex-direction: column; gap: 0; }
+  .profile-empty { padding: 24px 20px; }
+}
+
+/* Selection stays solid; unselected options use a lighter orange surface. */
+.ux-tabs button[aria-pressed],.ux-tabs a {
+  background: #fff0e5; color: #873000; box-shadow: none; font-weight: 700;
+}
+.ux-tabs button[aria-pressed]:hover:not(:disabled),.ux-tabs a:hover {
+  background: #ffdbbf; color: #642600; filter: none;
+}
+.ux-tabs button[aria-pressed=true],.ux-tabs button[aria-pressed=true]:hover:not(:disabled),
+.ux-tabs a.active,.ux-tabs a.active:hover {
+  background: #ff5a00; color: #291307; box-shadow: none; filter: none;
+}
+
+/* Let each option carry its own state; the tab row itself has no long tinted bar. */
+.ux-tabs {
+  background: transparent;
+  padding: 0;
+  gap: 8px;
+}
