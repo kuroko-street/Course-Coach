@@ -17,7 +17,7 @@ Supabase REST/GraphQL API การปิดส่วนนี้ยังเป
 สร้างไฟล์ `/home/ubuntu/coursecoach-cloud.pg.env` บน VM ด้วย `nano`:
 
 ```dotenv
-PGHOST=host-จาก-Supabase-Connect
+PGHOST=YOUR_SUPABASE_POOLER_HOST
 PGPORT=5432
 PGDATABASE=postgres
 PGUSER=postgres.รหัสโปรเจกต์จาก-Supabase-Connect
@@ -25,7 +25,8 @@ PGPASSWORD=ใส่รหัสผ่านฐานข้อมูลของ
 PGSSLMODE=require
 ```
 
-แทนค่าตัวอย่างด้วยข้อมูลจาก Supabase Connect และอย่านำไฟล์นี้ขึ้น GitHub
+แทนค่าตัวอย่างด้วยข้อมูลจาก Supabase Connect โดยคัดลอกค่า host ตามที่แสดง
+ทั้งค่า (ไม่ต้องเติมคำว่า `host-`) และอย่านำไฟล์นี้ขึ้น GitHub
 สร้างไฟล์ด้วย `nano` แล้วจำกัดสิทธิ์:
 
 ```bash
@@ -104,7 +105,7 @@ sudo docker run --rm --env-file /home/ubuntu/coursecoach-cloud.pg.env postgres:1
 จากไฟล์ที่สร้างในขั้นที่ 1 ไม่ต้องส่งรหัสผ่านในแชต:
 
 ```dotenv
-CLOUD_DB_HOST=host-จาก-Supabase-Connect
+CLOUD_DB_HOST=YOUR_SUPABASE_POOLER_HOST
 CLOUD_DB_PORT=5432
 CLOUD_DB_NAME=postgres
 CLOUD_DB_USER=postgres.รหัสโปรเจกต์จาก-Supabase-Connect
