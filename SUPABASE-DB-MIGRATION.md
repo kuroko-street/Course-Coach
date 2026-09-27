@@ -40,6 +40,22 @@ sudo docker run --rm --env-file /home/ubuntu/coursecoach-cloud.pg.env postgres:1
 มีอยู่ใน schema `extensions` ให้ตรวจวิธีย้าย extension/index ก่อน เพราะฐานเดิม
 สร้าง trigram index โดยอ้าง operator class ใน `public`
 
+ไฟล์ที่ dump ด้วย `-n public` อาจไม่รวม extension ที่ schema นี้ใช้งาน
+ฐานเดิมมีดัชนีที่อ้าง `public.gin_trgm_ops` ดังนั้นหากคำสั่งตรวจข้างบน
+ไม่แสดง `pg_trgm` เลย ให้สร้าง extension ใน **schema `public`** บน Supabase
+ก่อน restore โดยใช้ SQL Editor:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+SELECT extname, extnamespace::regnamespace
+FROM pg_extension WHERE extname = 'pg_trgm';
+SELECT count(*) FROM information_schema.tables
+WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+```
+
+ผลตรวจ extension ต้องเป็น `pg_trgm | public` และจำนวนตารางต้องยังเป็น `0`
+หากไม่ใช่ให้หยุดและตรวจสาเหตุก่อน
+
 ## 2. เตรียม Compose บน VM
 
 นำ `docker-compose.cloud-db.yml` ไปวางข้าง `docker-compose.yml` ใน
@@ -77,7 +93,7 @@ sed -i '/ SCHEMA - public /d' /home/ubuntu/coursecoach-backups/restore.list
 sudo docker run --rm \
   --env-file /home/ubuntu/coursecoach-cloud.pg.env \
   -v /home/ubuntu/coursecoach-backups:/backup:ro postgres:16 \
-  pg_restore --exit-on-error --no-owner --no-acl \
+  pg_restore --single-transaction --no-owner --no-acl \
   --use-list=/backup/restore.list --dbname=postgres \
   /backup/pre-supabase.dump
 ```
