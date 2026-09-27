@@ -1,0 +1,19 @@
+# Add after docker-compose.yml when the existing VM should use Supabase PostgreSQL.
+# The original db service and its volume remain untouched for rollback.
+services:
+  migrate:
+    environment:
+      DB_HOST: ${CLOUD_DB_HOST:?Set CLOUD_DB_HOST}
+      DB_PORT: ${CLOUD_DB_PORT:-5432}
+      DB_NAME: ${CLOUD_DB_NAME:-postgres}
+      DB_USER: ${CLOUD_DB_USER:?Set CLOUD_DB_USER}
+      DB_PASSWORD: ${CLOUD_DB_PASSWORD:?Set CLOUD_DB_PASSWORD}
+      PGSSLMODE: require
+  backend:
+    environment:
+      DB_HOST: ${CLOUD_DB_HOST:?Set CLOUD_DB_HOST}
+      DB_PORT: ${CLOUD_DB_PORT:-5432}
+      DB_NAME: ${CLOUD_DB_NAME:-postgres}
+      DB_USER: ${CLOUD_DB_USER:?Set CLOUD_DB_USER}
+      DB_PASSWORD: ${CLOUD_DB_PASSWORD:?Set CLOUD_DB_PASSWORD}
+      PGSSLMODE: require
