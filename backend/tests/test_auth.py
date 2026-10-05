@@ -82,3 +82,46 @@ def test_google_login_creates_session_and_user(client, db_conn, monkeypatch):
             )
             cur.execute("DELETE FROM users WHERE google_sub = %s", (google_sub,))
         db_conn.commit()
+
+
+def test_google_relogin_keeps_avatar_chosen_in_app(client, db_conn, monkeypatch):
+    google_sub = "google-avatar-preserve-test"
+    email = "avatar-preserve-test@kmitl.ac.th"
+    identity = {
+        "sub": google_sub,
+        "email": email,
+        "email_verified": True,
+        "hd": "kmitl.ac.th",
+        "name": "Avatar Test Student",
+        "picture": "https://example.test/google-original.png",
+    }
+    monkeypatch.setattr(user_routes.service.google_verifier, "verify", lambda _credential: identity)
+
+    try:
+        first_login = client.post("/api/auth/google", json={"credential": "signed-token"})
+        assert first_login.status_code == 200, first_login.text
+        user_id = first_login.json()["user"]["user_id"]
+        assert first_login.json()["user"]["avatar_url"] == identity["picture"]
+
+        custom_avatar = f"/api/users/{user_id}/avatar?v=custom"
+        with db_conn.cursor() as cur:
+            cur.execute("UPDATE users SET avatar_url = %s WHERE user_id = %s", (custom_avatar, user_id))
+        db_conn.commit()
+        client.post("/api/auth/logout")
+
+        identity["picture"] = "https://example.test/google-new.png"
+        relogin = client.post("/api/auth/google", json={"credential": "signed-token"})
+        assert relogin.status_code == 200, relogin.text
+        assert relogin.json()["user"]["avatar_url"] == custom_avatar
+        assert client.get("/api/auth/me").json()["user"]["avatar_url"] == custom_avatar
+        assert client.get(f"/api/users/{user_id}/profile").json()["user"]["avatar_url"] == custom_avatar
+    finally:
+        client.post("/api/auth/logout")
+        with db_conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM audit_logs WHERE user_id IN "
+                "(SELECT user_id FROM users WHERE google_sub = %s)",
+                (google_sub,),
+            )
+            cur.execute("DELETE FROM users WHERE google_sub = %s", (google_sub,))
+        db_conn.commit()

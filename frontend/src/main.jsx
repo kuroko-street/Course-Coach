@@ -7,6 +7,7 @@ import "./index.css";
 import "./ux.css";
 import "./course-coach-theme.css";
 import "./file-preview.css";
+import "./profile-redesign.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
