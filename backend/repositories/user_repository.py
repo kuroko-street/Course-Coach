@@ -42,7 +42,7 @@ class UserRepository:
             return cur.fetchone()
 
     def find_or_create_google_user(self, conn, google_sub, email, display_name, avatar_url):
-        """Link a verified Google identity without changing an existing role."""
+        """Link a verified Google identity without replacing a saved profile photo."""
         fields = f"""user_id, username, email, student_number, role, avatar_url,
                     {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until"""
         with dict_cursor(conn) as cur:
@@ -51,7 +51,7 @@ class UserRepository:
             if user is not None:
                 cur.execute(
                     f"""
-                    UPDATE users SET email = %s, avatar_url = COALESCE(%s, avatar_url)
+                    UPDATE users SET email = %s, avatar_url = COALESCE(NULLIF(avatar_url, ''), %s)
                     WHERE user_id = %s RETURNING {fields};
                     """,
                     (email, avatar_url, user["user_id"]),
@@ -63,7 +63,7 @@ class UserRepository:
             if existing is not None:
                 cur.execute(
                     f"""
-                    UPDATE users SET google_sub = %s, avatar_url = COALESCE(%s, avatar_url)
+                    UPDATE users SET google_sub = %s, avatar_url = COALESCE(NULLIF(avatar_url, ''), %s)
                     WHERE user_id = %s RETURNING {fields};
                     """,
                     (google_sub, avatar_url, existing["user_id"]),
