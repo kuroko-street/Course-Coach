@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, apiUpload } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
+import { useToast } from "./components/ToastProvider.jsx";
 
 function ProfilePortrait({ name, url, large = false }) {
   const initial = name?.trim().charAt(0).toLocaleUpperCase("th-TH") || "?";
@@ -13,24 +14,24 @@ function ProfilePortrait({ name, url, large = false }) {
 export default function Profile() {
   const { id } = useParams();
   const { user, updateUser } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
   const own = user?.user_id === Number(id);
 
   useEffect(() => {
     let cancelled = false;
-    setData(null); setError(""); setMessage("");
+    setData(null); setError("");
     api(`/users/${id}/profile`).then(result => {
       if (!cancelled) { setData(result); setName(result.user.display_name); }
     }).catch(err => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
   }, [id]);
 
-  async function update(operation, successText, syncName = false) {
-    setPending(true); setError(""); setMessage("");
+  async function update(operation, successTitle, successMessage = "", syncName = false) {
+    setPending(true);
     try {
       const result = await operation();
       updateUser(result.user);
@@ -39,8 +40,8 @@ export default function Profile() {
         user: { ...prev.user, display_name: result.user.display_name, avatar_url: result.user.avatar_url },
       }));
       if (syncName) setName(result.user.display_name);
-      setMessage(successText);
-    } catch (err) { setError(err.message); }
+      toast.success(successTitle, successMessage);
+    } catch (err) { toast.error("บันทึกโปรไฟล์ไม่สำเร็จ", err.message); }
     finally { setPending(false); }
   }
 
@@ -70,7 +71,8 @@ export default function Profile() {
             e.preventDefault();
             if (name.trim()) update(
               () => api("/users/me", { method: "PUT", body: { display_name: name.trim() } }),
-              "บันทึกชื่อแล้ว ชื่อใหม่จะแสดงกับผลงานเดิมของคุณด้วย",
+              "บันทึกชื่อแล้ว",
+              "ชื่อใหม่จะแสดงกับผลงานเดิมของคุณด้วย",
               true
             );
           }}>
@@ -107,7 +109,6 @@ export default function Profile() {
           </label>
           <p className="profile-photo-hint">PNG, JPEG หรือ WebP</p>
         </div>
-        {message && <p className="alert alert-success profile-save-message" role="status">{message}</p>}
       </div>}
 
       <section className="card profile-history" aria-labelledby="profile-history-title">

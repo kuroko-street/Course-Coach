@@ -84,7 +84,6 @@
   border: 0;
 }
 .profile-photo-hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
-.profile-save-message { grid-column: 1 / -1; margin: 0; }
 
 .profile-history { padding: 26px 30px; }
 .profile-history h2 { padding-bottom: 14px; border-bottom: 1px solid var(--border); }

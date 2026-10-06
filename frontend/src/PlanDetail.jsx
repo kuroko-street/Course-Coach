@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
+import { useToast } from "./components/ToastProvider.jsx";
 
 const SEMESTER_OPTIONS = ["1", "2", "summer"];
 
@@ -21,11 +22,11 @@ const WARNING_LABELS = {
 export default function PlanDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
@@ -45,9 +46,13 @@ export default function PlanDetail() {
     setNameDraft(data.plan_name);
   }
 
+  async function refreshAfterChange() {
+    try { await loadPlan(); }
+    catch (err) { setError(`บันทึกแล้ว แต่โหลดแผนล่าสุดไม่สำเร็จ: ${err.message}`); }
+  }
+
   async function loadAll() {
     setLoading(true);
-    setError("");
     try {
       await loadPlan();
     } catch (err) {
@@ -94,6 +99,7 @@ export default function PlanDetail() {
     e.preventDefault();
     if (!nameDraft.trim()) return;
     setError("");
+    setError("");
     try {
       await api(`/plans/${id}`, {
         method: "PUT",
@@ -101,9 +107,10 @@ export default function PlanDetail() {
         body: { plan_name: nameDraft.trim() },
       });
       setRenaming(false);
-      await loadPlan();
+      toast.success("เปลี่ยนชื่อแผนแล้ว");
+      await refreshAfterChange();
     } catch (err) {
-      setError(err.message);
+      toast.error("เปลี่ยนชื่อแผนไม่สำเร็จ", err.message);
     }
   }
 
@@ -115,7 +122,6 @@ export default function PlanDetail() {
     }
     setAdding(true);
     setError("");
-    setSuccess("");
     try {
       await api(`/plans/${id}/items`, {
         method: "POST",
@@ -126,12 +132,12 @@ export default function PlanDetail() {
           semester: addForm.semester,
         },
       });
-      setSuccess("เพิ่มวิชาลงแผนแล้ว");
+      toast.success("เพิ่มวิชาลงแผนแล้ว");
       setSelectedCourse(null);
       setCourseSearch("");
-      await loadPlan();
+      await refreshAfterChange();
     } catch (err) {
-      setError(err.message);
+      toast.error("เพิ่มวิชาไม่สำเร็จ", err.message);
     } finally {
       setAdding(false);
     }
@@ -145,9 +151,10 @@ export default function PlanDetail() {
         userId: user.user_id,
         body: { academic_year: Number(academic_year), semester },
       });
-      await loadPlan();
+      await refreshAfterChange();
+      toast.success("ย้ายวิชาในแผนแล้ว");
     } catch (err) {
-      setError(err.message);
+      toast.error("ย้ายวิชาไม่สำเร็จ", err.message);
     }
   }
 
@@ -155,10 +162,10 @@ export default function PlanDetail() {
     setError("");
     try {
       await api(`/plans/${id}/items/${itemId}`, { method: "DELETE", userId: user.user_id });
-      setSuccess("ลบวิชาออกจากแผนแล้ว");
-      await loadPlan();
+      toast.success("ลบวิชาออกจากแผนแล้ว");
+      await refreshAfterChange();
     } catch (err) {
-      setError(err.message);
+      toast.error("ลบวิชาไม่สำเร็จ", err.message);
     }
   }
 
@@ -201,7 +208,6 @@ export default function PlanDetail() {
       </section>
 
       {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
 
       <section>
         <h2>เพิ่มวิชาลงแผน</h2>

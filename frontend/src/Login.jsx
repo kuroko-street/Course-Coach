@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
 import Avatar from "./Avatar.jsx";
+import { useToast } from "./components/ToastProvider.jsx";
 
 const GOOGLE_SCRIPT_ID = "google-identity-services";
 let initializedGoogleClientId = null;
@@ -30,6 +31,7 @@ function loadGoogleIdentityScript() {
 
 export default function Login() {
   const { user, login, loginMock, authReady } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const buttonRef = useRef(null);
@@ -48,6 +50,7 @@ export default function Login() {
       setPending(true);
       try {
         const signedIn = await login(credential);
+        toast.success("เข้าสู่ระบบแล้ว", `ยินดีต้อนรับ ${signedIn.display_name}`);
         navigate(returnPath || (signedIn.role === "ADMIN" ? "/admin" : "/"), {
           replace: true,
         });
@@ -57,7 +60,7 @@ export default function Login() {
         setPending(false);
       }
     },
-    [returnPath, login, navigate]
+    [returnPath, login, navigate, toast]
   );
 
   useEffect(() => {
@@ -84,6 +87,7 @@ export default function Login() {
     setMockPendingId(candidate.user_id);
     try {
       const signedIn = await loginMock(candidate.user_id);
+      toast.success("เข้าสู่ระบบแล้ว", `ยินดีต้อนรับ ${signedIn.display_name}`);
       navigate(returnPath || (signedIn.role === "ADMIN" ? "/admin" : "/"), {
         replace: true,
       });

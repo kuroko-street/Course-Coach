@@ -2,6 +2,7 @@ import {useEffect,useId,useRef,useState} from 'react';
 import {api} from '../api.js';
 import {semesterLabel} from './CourseUI.jsx';
 import {Modal} from './Modal.jsx';
+import {useToast} from './ToastProvider.jsx';
 
 export function coursePayload(course={}){
   return {university_id:1,faculty_id:course.faculty_id||'',department_id:course.department_id||'',course_code:course.course_code||'',course_name:course.course_name||'',credits:course.credits??'',academic_year:course.academic_year||new Date().getFullYear()+543,semester:course.semester||'1',instructor_ids:course.instructor_ids||(course.instructors||[]).map(x=>x.instructor_id),syllabus:course.syllabus||'',additional_details:course.additional_details||''};
@@ -9,8 +10,9 @@ export function coursePayload(course={}){
 export function numericPayload(form){return {...form,university_id:1,faculty_id:Number(form.faculty_id),department_id:Number(form.department_id),credits:Number(form.credits),academic_year:Number(form.academic_year),instructor_ids:form.instructor_ids.map(Number)};}
 
 function AddTeacher({initialName,onClose,onAdded}){
+  const toast=useToast();
   const id=useId(),formRef=useRef(null),[name,setName]=useState(initialName),[affiliation,setAffiliation]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  async function submit(e){e.preventDefault();e.stopPropagation();if(busy)return;setBusy(true);setError('');try{const data=await api('/instructors',{method:'POST',body:{name:name.trim(),affiliation:affiliation.trim()||null}});onAdded(data.instructor);onClose();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function submit(e){e.preventDefault();e.stopPropagation();if(busy)return;setBusy(true);setError('');try{const data=await api('/instructors',{method:'POST',body:{name:name.trim(),affiliation:affiliation.trim()||null}});onAdded(data.instructor);toast.success('เพิ่มชื่ออาจารย์แล้ว',data.instructor.name);onClose();}catch(e){setError(e.message);}finally{setBusy(false);}}
   return <Modal title="เพิ่มชื่ออาจารย์" subtitle="เพิ่มรายชื่อผู้สอน ไม่ใช่สร้างบัญชีเข้าสู่ระบบ" onClose={onClose} busy={busy} dirty={name!==initialName||!!affiliation} footer={<><button className="btn-ghost" type="button" disabled={busy} onClick={()=>formRef.current?.closest('[role="dialog"]')?.querySelector('.modal-close')?.click()}>ยกเลิก</button><button type="submit" form={id} disabled={busy||name.trim().length<2}>{busy?'กำลังเพิ่ม…':'เพิ่มและเลือกผู้สอน'}</button></>}><form ref={formRef} id={id} onSubmit={submit}><label>ชื่อ–นามสกุลผู้สอน *<input required autoComplete="off" minLength={2} maxLength={255} value={name} onChange={e=>setName(e.target.value)} disabled={busy}/></label><label>สังกัด <span className="muted">(ถ้าทราบ)</span><input maxLength={255} value={affiliation} onChange={e=>setAffiliation(e.target.value)} disabled={busy} placeholder="เช่น ภาควิชาวิทยาการคอมพิวเตอร์ สจล."/></label><p className="ux-form-hint">ชื่อนี้จะถูกบันทึกในรายชื่อผู้สอนของระบบ โปรดตรวจชื่อเดิมก่อนเพิ่มเพื่อหลีกเลี่ยงข้อมูลซ้ำ</p>{error&&<p role="alert" className="alert alert-error">{error}</p>}</form></Modal>;
 }
 export default function CourseForm({value,onChange,options,initialTeachers=[],disabled=false,teacherError=''}){
