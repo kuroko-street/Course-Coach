@@ -107,16 +107,17 @@ button,.btn { font-size: 14px; letter-spacing: 0; }
   .profile-empty { padding: 24px 20px; }
 }
 
-/* Selection stays solid; unselected options use a lighter orange surface. */
+/* Tabs are a quiet navigation cue; reserve the vivid orange fill for actions. */
 .ux-tabs button[aria-pressed],.ux-tabs a {
-  background: #fff0e5; color: #873000; box-shadow: none; font-weight: 700;
+  background: #fff; color: #66574e; box-shadow: none; font-weight: 700;
 }
 .ux-tabs button[aria-pressed]:hover:not(:disabled),.ux-tabs a:hover {
-  background: #ffdbbf; color: #642600; filter: none;
+  background: #fff5ee; color: #873000; filter: none;
 }
 .ux-tabs button[aria-pressed=true],.ux-tabs button[aria-pressed=true]:hover:not(:disabled),
-.ux-tabs a.active,.ux-tabs a.active:hover {
-  background: #ff5a00; color: #291307; box-shadow: none; filter: none;
+.ux-tabs a.is-active,.ux-tabs a.is-active:hover {
+  background: #fff0e5; color: #873000;
+  box-shadow: inset 0 -3px 0 #ff6a18; filter: none;
 }
 
 /* Let each option carry its own state; the tab row itself has no long tinted bar. */
