@@ -10,6 +10,9 @@ import "./course-coach-theme.css";
 import "./file-preview.css";
 import "./profile-redesign.css";
 import "./toast.css";
+import "./review-rating.css";
+import "./readability.css";
+import "./dashboard-tabs.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

@@ -1,0 +1,69 @@
+/* Ranking tabs share the top edge of their controls panel. */
+.ux-rank-panel > .ux-tabs {
+  position: relative;
+  z-index: 1;
+  align-items: flex-end;
+  gap: 0;
+  margin-bottom: -1px;
+}
+
+.ux-rank-panel > .ux-tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 178px;
+  min-height: 50px;
+  margin-right: -1px;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: 11px 11px 0 0;
+  background: #fff7f2;
+  color: #6b5142;
+  font-size: 15px;
+  line-height: 1.4;
+  box-shadow: none;
+}
+
+.ux-rank-panel > .ux-tabs button:last-child { margin-right: 0; }
+.ux-rank-panel > .ux-tabs button:hover:not(:disabled) {
+  background: #fff0e5;
+  color: #873000;
+}
+
+.ux-rank-panel > .ux-tabs button[aria-pressed="true"],
+.ux-rank-panel > .ux-tabs button[aria-pressed="true"]:hover:not(:disabled) {
+  z-index: 2;
+  border-bottom-color: #fff;
+  background: #fff;
+  color: #a13b00;
+  box-shadow: none;
+}
+
+.ux-rank-panel > .ux-rank-controls {
+  position: relative;
+  margin: 0;
+  min-height: 112px;
+  padding: 22px 24px;
+  border-radius: 0 12px 12px 12px;
+}
+
+@media (max-width: 650px) {
+  .ux-rank-panel > .ux-tabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 54px;
+    padding: 8px 5px;
+    font-size: 13px;
+    white-space: normal;
+  }
+
+  .ux-rank-panel > .ux-rank-controls {
+    min-height: 0;
+    padding: 16px 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .ux-rank-panel > .ux-rank-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

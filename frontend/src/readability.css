@@ -1,0 +1,84 @@
+/* Thai text needs a little more room than the original compact UI allowed. */
+body {
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+label { font-size: 15px; }
+button, .btn { font-size: 15px; }
+
+/* Supporting copy stays quieter than body text, without becoming hard to read. */
+.meta,
+.small,
+.muted.small,
+.ux-page-note,
+.ux-course-subtitle,
+.ux-community-note,
+.ux-content-toolbar p,
+.ux-content-action p,
+.ux-review-card .rating-label,
+.ux-review-card .ux-author time,
+.ux-file-info .meta,
+.ux-form-hint,
+.ux-modal-header p,
+.ux-modal-footer .ux-footer-hint,
+.ux-rank-description,
+.ux-rank-controls p,
+.ux-rank-body .cc-context,
+.ux-dashboard .dashboard-summary-card span,
+.profile-photo-hint,
+.profile-hero-copy p,
+.profile-hero-stats span,
+.plan-item-ratings,
+.ad-list p,
+.ad-stat small,
+.app-toast-copy p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Compact labels still fit inside chips, tables, and status badges. */
+.role-pill,
+.mock-login-badge,
+.badge,
+.tag-chip,
+.ux-course-card .tag-chip,
+.ux-card-code,
+.ux-term-pill,
+.ux-filter-chip,
+.ux-eyebrow,
+.ux-page-heading .ux-eyebrow,
+.ux-review-score,
+.ux-file-type,
+.ux-tabs span,
+.report-badge,
+.status-inactive,
+.curriculum-chip,
+.status-waiting,
+.enrollment-status,
+.warning-badge,
+.small-inline,
+.ux-preview-button .ux-preview-loading,
+.ux-preview-button .ux-preview-action {
+  font-size: 13px;
+}
+
+.ux-review-modal .likert-question legend { font-size: 14px; }
+.ux-review-modal .likert-scale { font-size: 13px; }
+.ux-review-modal .likert-endpoints { font-size: 13px; }
+.ux-review-modal .likert-selection { font-size: 14px; }
+
+@media (max-width: 650px) {
+  .ux-navbar .nav-link,
+  .ux-page-heading > .btn,
+  .ux-content-toolbar p,
+  .ux-review-card .btn-ghost,
+  .ux-filter-mobile-toggle,
+  .ux-filter-chip,
+  .ux-card-code,
+  .ux-modal-footer .ux-footer-hint {
+    font-size: 13px;
+  }
+
+  .ux-review-modal .likert-scale { font-size: 13px; }
+}

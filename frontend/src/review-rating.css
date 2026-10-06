@@ -1,0 +1,136 @@
+/* Review questions use one continuous scale instead of five separate radio cards. */
+.ux-review-modal {
+  width: min(940px, 100%);
+  box-shadow: 0 24px 72px #17212b38;
+}
+
+.ux-review-modal .likert-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  border: 0;
+}
+
+.ux-review-modal .likert-scale {
+  grid-column: 1 / -1;
+  position: static;
+  top: auto;
+  margin: 0 0 4px;
+  padding: 11px 14px;
+  border-color: #efdfd5;
+  background: #fffaf7;
+  color: #475569;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+.ux-review-modal .likert-question {
+  min-width: 0;
+  min-height: 164px;
+  padding: 15px 16px 13px;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px #e5e9ee;
+  background: #fff;
+  scroll-margin-top: 18px;
+}
+
+.ux-review-modal .likert-question legend {
+  float: left;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 43px;
+  margin: 0 0 8px;
+  padding: 0;
+  color: #202936;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.ux-review-modal .likert-options {
+  clear: both;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  isolation: isolate;
+}
+
+.ux-review-modal .likert-option {
+  min-height: 42px;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  border: 0;
+  border-right: 2px solid #fff;
+  border-radius: 0;
+  color: #382b2b;
+  font-size: 14px;
+  font-weight: 700;
+  transition: filter 120ms ease;
+}
+
+.ux-review-modal .likert-option:last-child { border-right: 0; }
+.ux-review-modal .likert-option-1 { background: #f4abb0; }
+.ux-review-modal .likert-option-2 { background: #f5c6a4; }
+.ux-review-modal .likert-option-3 { background: #f4e2a2; }
+.ux-review-modal .likert-option-4 { background: #c6e5b8; }
+.ux-review-modal .likert-option-5 { background: #97ceb0; }
+
+.ux-review-modal .likert-option-1.selected { background: #b94452; }
+.ux-review-modal .likert-option-2.selected { background: #b86528; }
+.ux-review-modal .likert-option-3.selected { background: #856716; }
+.ux-review-modal .likert-option-4.selected { background: #4f853b; }
+.ux-review-modal .likert-option-5.selected { background: #218158; }
+.ux-review-modal .likert-option.selected {
+  border-color: #fff;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.ux-review-modal .likert-option:not(.selected):hover { filter: brightness(.94); }
+.ux-review-modal .likert-option:focus-within { outline: none; }
+.ux-review-modal .likert-option:has(input:focus-visible) {
+  z-index: 1;
+  outline: 2px solid #233143;
+  outline-offset: -2px;
+}
+
+.ux-review-modal .likert-endpoints {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.ux-review-modal .likert-endpoints span:last-child { text-align: right; }
+.ux-review-modal .likert-selection {
+  margin: 8px 0 0;
+  color: #202936;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 700;
+  text-align: right;
+}
+
+.ux-review-modal .likert-question.ux-field-invalid {
+  padding-left: 16px !important;
+  border-left: 0 !important;
+  box-shadow: inset 0 0 0 2px #b7424f;
+}
+
+@media (max-width: 720px) {
+  .ux-review-modal .likert-form { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .ux-review-modal .likert-scale { grid-column: 1; }
+  .ux-review-modal .likert-question { min-height: 0; padding: 13px 14px 12px; }
+  .ux-review-modal .likert-question legend { min-height: 0; }
+  .ux-review-modal .likert-option { min-height: 46px; }
+  .ux-review-modal .likert-question.ux-field-invalid { padding-left: 14px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ux-review-modal .likert-option { transition: none; }
+}

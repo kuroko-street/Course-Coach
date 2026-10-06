@@ -56,18 +56,20 @@ export function StarDisplay({ value }) {
 }
 
 function LikertInput({ field, label, value, onChange, invalid }) {
+  const selectedOption = LIKERT_OPTIONS.find((option) => option.value === value);
   return (
-    <fieldset className={`likert-question ${invalid ? 'ux-field-invalid' : ''}`} data-rating-field={field} aria-describedby={invalid ? `rating-error-${field}` : undefined}>
+    <fieldset className={`likert-question ${invalid ? 'ux-field-invalid' : ''}`} data-rating-field={field} aria-describedby={`rating-selection-${field}${invalid ? ` rating-error-${field}` : ''}`}>
       <legend>{label}</legend>
       <div className="likert-options">
         {LIKERT_OPTIONS.map((option) => (
-          <label className={`likert-option ${value === option.value ? "selected" : ""}`} key={option.value}>
+          <label className={`likert-option likert-option-${option.value} ${value === option.value ? "selected" : ""}`} key={option.value}>
             <input type="radio" name={`rating-${field}`} aria-label={`${option.value} ${option.label}`} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} />
-            <span className="likert-radio" aria-hidden="true" />
             <span>{option.value}</span>
           </label>
         ))}
       </div>
+      <div className="likert-endpoints" aria-hidden="true"><span>ไม่เห็นด้วยอย่างยิ่ง</span><span>เห็นด้วยอย่างยิ่ง</span></div>
+      <p id={`rating-selection-${field}`} className="likert-selection" aria-live="polite">{selectedOption ? `เลือก ${value} · ${selectedOption.label}` : 'ยังไม่ได้เลือกคะแนน'}</p>
       {invalid && <p id={`rating-error-${field}`} className="ux-field-error">กรุณาเลือกคะแนนด้านนี้</p>}
     </fieldset>
   );

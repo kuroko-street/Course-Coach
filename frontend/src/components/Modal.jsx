@@ -1,7 +1,7 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 
-export function Modal({title,subtitle,onClose,busy=false,dirty=false,footer,children}) {
+export function Modal({title,subtitle,onClose,busy=false,dirty=false,footer,children,className=''}) {
   const titleId=useId(),dialog=useRef(null),current=useRef({});
   const [discard,setDiscard]=useState(false);
   current.current={onClose,busy,dirty,discard};
@@ -36,7 +36,7 @@ export function Modal({title,subtitle,onClose,busy=false,dirty=false,footer,chil
     window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);
   },[dirty]);
   return createPortal(<div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)requestClose();}}>
-    <div ref={dialog} className="modal-card ux-modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <div ref={dialog} className={`modal-card ux-modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <header className="ux-modal-header"><div><h2 id={titleId}>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button type="button" className="modal-close" aria-label="ปิดหน้าต่าง" disabled={busy} onClick={requestClose}>×</button></header>
       {discard&&<div className="ux-discard" role="alertdialog" aria-label="ยืนยันการปิดโดยไม่บันทึก"><h3>ยังมีข้อมูลที่ไม่ได้บันทึก</h3><p>ถ้าปิดตอนนี้ ข้อความที่แก้หรือคิวไฟล์ที่ยังไม่สำเร็จจะไม่ถูกเก็บไว้</p><div className="cc-actions"><button type="button" data-keep-editing onClick={()=>setDiscard(false)}>กลับไปทำต่อ</button><button type="button" className="btn-danger-outline" onClick={onClose}>ทิ้งข้อมูลและปิด</button></div></div>}
       <div className="ux-modal-content" hidden={discard}>{children}</div>
