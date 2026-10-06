@@ -2,9 +2,11 @@ import {useRef,useState} from 'react';
 import {apiUploadMany} from '../api.js';
 import {Modal,courseSubtitle} from './CourseUI.jsx';
 import {FileQuota} from './ContributionStatus.jsx';
+import {useToast} from './ToastProvider.jsx';
 const MAX_BYTES=10000000,EXTENSIONS=['pdf','jpg','jpeg','png','docx','pptx','xlsx'];
 
 export default function UploadDialog({courseId,course,quota,onClose,onSaved}){
+  const toast=useToast();
   const [queue,setQueue]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState('');const running=useRef(false),wrapper=useRef(null);
   const waiting=queue.filter(r=>r.status!=='success'&&!r.error),successCount=queue.filter(r=>r.status==='success').length;
   const unattempted=waiting.filter(r=>!r.attempted).length,tooMany=!!quota&&unattempted>quota.available;
@@ -18,10 +20,13 @@ export default function UploadDialog({courseId,course,quota,onClose,onSaved}){
     if(!quota||tooMany){setError(`เหลือ ${quota?.available??0} ช่อง กรุณานำไฟล์ส่วนเกินออกจากคิวก่อน`);return;}
     running.current=true;setBusy(true);setError('');
     try{
+      let uploaded=0,failed=0;
       for(const row of waiting){
         patch(row.id,{status:'uploading',attempted:true});
-        try{await apiUploadMany(`/courses/${courseId}/summary-files`,{files:[row.file],fields:{upload_request_id:row.id}});patch(row.id,{status:'success'});}catch(e){patch(row.id,{status:'failed',error:e.message});}
+        try{await apiUploadMany(`/courses/${courseId}/summary-files`,{files:[row.file],fields:{upload_request_id:row.id}});patch(row.id,{status:'success'});uploaded++;}catch(e){patch(row.id,{status:'failed',error:e.message});failed++;}
       }
+      if(uploaded)toast.success('อัปโหลดไฟล์แล้ว',`${uploaded} ไฟล์ถูกเพิ่มในรายวิชา`);
+      if(failed)toast.error('บางไฟล์อัปโหลดไม่สำเร็จ',`ตรวจรายการที่มีข้อผิดพลาด ${failed} ไฟล์`);
       await onSaved?.();
     }catch(e){setError('อัปโหลดแล้วบางรายการ แต่โหลดข้อมูลล่าสุดไม่สำเร็จ: '+e.message);}finally{running.current=false;setBusy(false);}
   }

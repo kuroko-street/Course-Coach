@@ -5,8 +5,10 @@ import {useAuth} from '../AuthContext.jsx';
 import {loginPath} from './CourseUI.jsx';
 import ActionMenu from './ActionMenu.jsx';
 import {ConfirmDialog} from './Modal.jsx';
+import {useToast} from './ToastProvider.jsx';
 
 export default function CommentThread({basePath,onChanged}){
+  const toast=useToast();
   const {user}=useAuth(),location=useLocation(),editRef=useRef(null);
   const [items,setItems]=useState([]),[text,setText]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
   const [editing,setEditing]=useState(null),[editText,setEditText]=useState(''),[reported,setReported]=useState([]),[confirm,setConfirm]=useState(null);
@@ -17,7 +19,7 @@ export default function CommentThread({basePath,onChanged}){
     if(busy)return;setBusy(true);setError('');
     try{
       await api(path,{method,body});done?.();setConfirm(null);
-      try{await load();await onChanged?.();}catch(err){setError('บันทึกแล้ว แต่โหลดความคิดเห็นล่าสุดไม่สำเร็จ กรุณาปิดและเปิดความคิดเห็นใหม่');}
+      try{await load();await onChanged?.();toast.success(path.endsWith('/report')?'รายงานความคิดเห็นแล้ว':method==='DELETE'?'ลบความคิดเห็นแล้ว':method==='PUT'?'แก้ไขความคิดเห็นแล้ว':'ส่งความคิดเห็นแล้ว');}catch(err){setError('บันทึกแล้ว แต่โหลดความคิดเห็นล่าสุดไม่สำเร็จ กรุณาปิดและเปิดความคิดเห็นใหม่');}
     }catch(err){setError(err.message);}finally{setBusy(false);}
   }
   return <div className="comments-list ux-comments">

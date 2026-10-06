@@ -3,9 +3,11 @@ import {Link,useSearchParams} from 'react-router-dom';
 import {api} from './api.js';
 import CourseForm,{coursePayload,numericPayload} from './components/CourseForm.jsx';
 import {CatalogFilters,CourseContext,useCatalogOptions} from './components/CourseUI.jsx';
+import {useToast} from './components/ToastProvider.jsx';
 
 const FIELD_LABELS={course_code:'รหัส',course_name:'ชื่อวิชา',faculty_id:'คณะ',department_id:'สาขา',academic_year:'ปี',semester:'เทอม',credits:'หน่วยกิต',instructor_ids:'ชุดผู้สอน',syllabus:'คำอธิบาย',additional_details:'รายละเอียดเพิ่มเติม'};
 export default function Admin(){
+  const toast=useToast();
   const [searchParams]=useSearchParams();
   const {options,error:optionsError}=useCatalogOptions();
   const [filters,setFilters]=useState({});const [search,setSearch]=useState('');const [code,setCode]=useState(searchParams.get('code') || '');const [page,setPage]=useState(1);
@@ -13,29 +15,29 @@ export default function Admin(){
   const [primary,setPrimary]=useState(null);const [form,setForm]=useState(coursePayload());const [reason,setReason]=useState('');const [keep,setKeep]=useState([]);
   const [preview,setPreview]=useState(null);const [requestId,setRequestId]=useState('');const [history,setHistory]=useState([]);
   const [keepReviews,setKeepReviews]=useState([]);const [acceptOverage,setAcceptOverage]=useState(false);
-  const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [refresh,setRefresh]=useState(0);
+  const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [refresh,setRefresh]=useState(0);
   const qs=new URLSearchParams({search,code,page,page_size:50});Object.entries(filters).forEach(([k,v])=>{if(Array.isArray(v))v.forEach(x=>qs.append(k,x));else if(v!=='')qs.set(k,v);});const query=qs.toString();
   useEffect(()=>{const controller=new AbortController();const timer=setTimeout(()=>{api(`/admin/courses?${query}`,{signal:controller.signal}).then(setData).catch(err=>{if(err.name!=='AbortError')setError(err.message);});},250);return()=>{clearTimeout(timer);controller.abort();};},[query,refresh]);
   useEffect(()=>{api('/admin/merge-history').then(r=>setHistory(r.history)).catch(err=>setError(err.message));},[refresh]);
-  function pick(c){if(selected.some(x=>x.course_id===c.course_id))setSelected(prev=>prev.filter(x=>x.course_id!==c.course_id));else if(selected.length<21)setSelected(prev=>[...prev,c]);else setError('รวมได้สูงสุด 21 รายการต่อครั้ง');}
-  function start(nextMode,c){setMode(nextMode);setPrimary(c.course_id);setForm(coursePayload(c));setPreview(null);setKeep([]);setKeepReviews([]);setAcceptOverage(false);setReason('');setError('');setMessage('');}
+  function pick(c){if(selected.some(x=>x.course_id===c.course_id))setSelected(prev=>prev.filter(x=>x.course_id!==c.course_id));else if(selected.length<21)setSelected(prev=>[...prev,c]);else toast.info('เลือกได้สูงสุด 21 รายการต่อครั้ง');}
+  function start(nextMode,c){setMode(nextMode);setPrimary(c.course_id);setForm(coursePayload(c));setPreview(null);setKeep([]);setKeepReviews([]);setAcceptOverage(false);setReason('');setError('');}
   function editForm(next){setForm(next);setPreview(null);}
   function mergeBody(){return {primary_course_id:primary,source_course_ids:selected.filter(c=>c.course_id!==primary).map(c=>c.course_id),final_course:numericPayload(form),reason:reason.trim(),keep_plan_item_ids:keep,keep_review_ids:keepReviews,accept_file_overage:acceptOverage};}
-  async function save(e){e.preventDefault();setBusy(true);setError('');setMessage('');try{
+  async function save(e){e.preventDefault();setBusy(true);setError('');try{
     if(!form.instructor_ids.length)throw new Error('เลือกผู้สอนอย่างน้อยหนึ่งคน');
-    if(mode==='edit'){await api(`/admin/courses/${primary}`,{method:'PUT',body:numericPayload(form)});setMode(null);setSelected([]);setRefresh(x=>x+1);setMessage('บันทึกข้อมูลวิชาแล้ว');}
+    if(mode==='edit'){await api(`/admin/courses/${primary}`,{method:'PUT',body:numericPayload(form)});setMode(null);setSelected([]);setRefresh(x=>x+1);toast.success('บันทึกข้อมูลวิชาแล้ว');}
     else{const result=await api('/admin/courses/merge/preview',{method:'POST',body:mergeBody()});setPreview(result);setRequestId(crypto.randomUUID());}
   }catch(err){setError(err.message);}finally{setBusy(false);}}
   async function confirm(){if(!window.confirm('ยืนยันรวมรายการตามข้อมูลที่ตรวจแล้ว? รายการต้นทางจะพาไปยังรายการหลัก และการย้อนกลับต้องใช้ประวัติ/สำเนาสำรอง'))return;setBusy(true);setError('');try{
     const result=await api('/admin/courses/merge',{method:'POST',body:{...mergeBody(),preview_token:preview.preview_token,request_id:requestId}});
-    setMessage(`รวมสำเร็จ รายการหลัก #${result.course_id} · ประวัติ #${result.merge_id}`);setMode(null);setSelected([]);setRefresh(x=>x+1);
+    toast.success('รวมรายวิชาแล้ว',`รายการหลัก #${result.course_id} · ประวัติ #${result.merge_id}`);setMode(null);setSelected([]);setRefresh(x=>x+1);
   }catch(err){setError(err.message);}finally{setBusy(false);}}
-  async function status(c){if(!window.confirm(`${c.is_active?'ปิด':'เปิด'}แสดงวิชานี้? การปิดจะซ่อนเนื้อหาที่อยู่ภายในจากหน้าสาธารณะด้วย`))return;setBusy(true);try{await api(`/admin/courses/${c.course_id}/status`,{method:'PATCH',body:{is_active:!c.is_active}});setRefresh(x=>x+1);}catch(err){setError(err.message);}finally{setBusy(false);}}
+  async function status(c){if(!window.confirm(`${c.is_active?'ปิด':'เปิด'}แสดงวิชานี้? การปิดจะซ่อนเนื้อหาที่อยู่ภายในจากหน้าสาธารณะด้วย`))return;setBusy(true);setError('');try{await api(`/admin/courses/${c.course_id}/status`,{method:'PATCH',body:{is_active:!c.is_active}});setRefresh(x=>x+1);toast.success(c.is_active?'ปิดแสดงรายวิชาแล้ว':'เปิดแสดงรายวิชาแล้ว');}catch(err){toast.error('เปลี่ยนสถานะไม่สำเร็จ',err.message);}finally{setBusy(false);}}
   const selectedPrimary=selected.find(c=>c.course_id===primary);
   const planChoicesComplete=preview?.plan_conflicts.every(c=>c.item_ids.filter(id=>keep.includes(id)).length===1);
   const reviewChoicesComplete=preview?.review_conflicts.every(c=>c.reviews.filter(r=>keepReviews.includes(r.review_id)).length===1);
   return <section><h1>จัดการข้อมูลรายวิชา</h1><p className="cc-info">แอดมินแก้ข้อมูลหรือรวมรายการซ้ำเป็นกรณีพิเศษ ไม่ต้องตรวจรีวิวและไฟล์ทีละรายการ เนื้อหาที่ถูกรายงานครบ 5 บัญชีจะถูกซ่อนอัตโนมัติ</p>
-    {(error || optionsError)&&<p className="alert alert-error" role="alert">{error || optionsError}</p>}{message&&<p className="alert alert-success" role="status">{message}</p>}
+    {(error || optionsError)&&<p className="alert alert-error" role="alert">{error || optionsError}</p>}
     {mode&&options?<form className="card" onSubmit={save}>
       <h2>{mode==='merge'?'รวมรายการวิชา':'แก้ข้อมูลรายวิชา'} #{primary}</h2>
       {mode==='merge'&&<><label>รายการหลัก (ใช้ URL นี้ต่อ)<select value={primary} onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));setPrimary(c.course_id);editForm(coursePayload(c));setKeep([]);}}>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} {c.course_code} {c.course_name} ({c.academic_year}/{c.semester})</option>)}</select></label><p>เลือกข้อมูลที่จะเก็บเป็นรายช่อง หรือปรับในฟอร์มด้านล่าง ชุดผู้สอนไม่ถูกรวมอัตโนมัติ</p><div className="cc-form-grid">{Object.entries(FIELD_LABELS).map(([key,label])=><label key={key}>{label}: คัดลอกจาก<select value="" onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));if(c)editForm({...form,[key]:coursePayload(c)[key]});}}><option value="">เลือกต้นทาง</option>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} · {c.course_name}</option>)}</select></label>)}</div></>}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
+import { useToast } from "./components/ToastProvider.jsx";
 
 /** Smallest positive N such that "แผนN" isn't already taken (reuses gaps left by deleted plans). */
 function nextPlanName(existingPlans) {
@@ -24,6 +25,7 @@ function nextPlanName(existingPlans) {
  */
 export default function Plans() {
   const { user } = useAuth();
+  const toast = useToast();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,9 +58,10 @@ export default function Plans() {
         userId: user.user_id,
         body: { plan_name: nextPlanName(plans) },
       });
+      toast.success("สร้างแผนการเรียนแล้ว");
       await load();
     } catch (err) {
-      setError(err.message);
+      toast.error("สร้างแผนไม่สำเร็จ", err.message);
     } finally {
       setCreating(false);
     }
@@ -70,8 +73,9 @@ export default function Plans() {
     try {
       await api(`/plans/${planId}`, { method: "DELETE", userId: user.user_id });
       setPlans((prev) => prev.filter((p) => p.plan_id !== planId));
+      toast.success("ลบแผนการเรียนแล้ว");
     } catch (err) {
-      setError(err.message);
+      toast.error("ลบแผนไม่สำเร็จ", err.message);
     }
   }
 
