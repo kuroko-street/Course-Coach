@@ -25,7 +25,7 @@ function RequireAuth({ children, admin = false }) {
 }
 
 export default function App() {
-  return <><NavBar /><main id="main-content" className="container" tabIndex={-1}><Routes>
+  return <><NavBar /><main id="main-content" className="container app-main" tabIndex={-1}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/" element={<Home />} />
     <Route path="/courses/new" element={<RequireAuth><CourseCreate /></RequireAuth>} />

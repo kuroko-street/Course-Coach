@@ -13,6 +13,7 @@ import "./toast.css";
 import "./review-rating.css";
 import "./readability.css";
 import "./dashboard-tabs.css";
+import "./app-shell.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
