@@ -193,7 +193,7 @@ export default function PlanDetail() {
       <section className="plan-header-row">
         {renaming ? (
           <form onSubmit={handleRename} style={{ display: "flex", gap: 8, flex: 1 }}>
-            <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} autoFocus />
+            <input maxLength={255} value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} autoFocus />
             <button type="submit">บันทึก</button>
             <button type="button" className="btn-ghost" onClick={() => setRenaming(false)}>
               ยกเลิก
@@ -201,7 +201,7 @@ export default function PlanDetail() {
           </form>
         ) : (
           <>
-            <h1 className="course-title" style={{ marginTop: 0 }}>{plan.plan_name}</h1>
+            <h1 className="course-title" title={plan.plan_name} style={{ marginTop: 0 }}>{plan.plan_name}</h1>
             <button type="button" className="btn-ghost" onClick={() => setRenaming(true)}>
               เปลี่ยนชื่อแผน
             </button>
@@ -217,7 +217,7 @@ export default function PlanDetail() {
         <div className="card course-picker">
           <div className="filter-bar">
             <input
-              className="search-bar"
+              className="search-bar" maxLength={300}
               type="search"
               placeholder="ค้นหาด้วยรหัสวิชา, ชื่อวิชา, หรือแท็ก…"
               value={courseSearch}
@@ -246,7 +246,7 @@ export default function PlanDetail() {
           {selectedCourse ? (
             <div className="selected-course-chip">
               <span className="badge">{selectedCourse.course_code}</span>
-              <strong>{selectedCourse.course_name}</strong>
+              <strong title={selectedCourse.course_name}>{selectedCourse.course_name}</strong>
               <span>อ้างอิง {selectedCourse.academic_year}/{selectedCourse.semester} · {(selectedCourse.instructors || []).map(i=>i.name).join(', ')}</span>
               <button type="button" className="btn-ghost" onClick={() => setSelectedCourse(null)}>
                 เปลี่ยนวิชา
@@ -333,7 +333,7 @@ export default function PlanDetail() {
                     <Link to={`/course/${item.course_id}`} className="badge">
                       {item.course_code}
                     </Link>
-                    <strong>{item.course_name}</strong>
+                    <strong title={item.course_name}>{item.course_name}</strong>
                     <span className="muted small"> · {item.credits} หน่วยกิต</span>
                     <div className="muted small">รายการอ้างอิง {item.source_academic_year}/{item.source_semester} · {item.instructor_names}</div>
                     <div className="plan-item-ratings">

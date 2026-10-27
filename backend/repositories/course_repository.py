@@ -11,14 +11,12 @@ COURSE_ROWS = """
  SELECT c.*,f.name AS faculty_name,u.name AS university_name,
  COALESCE(i.instructors,'[]'::json) AS instructors,COALESCE(i.names,'') AS instructor_names,
  COALESCE(t.tags,'[]'::json) AS tags,COALESCE(t.names,'') AS tag_names,
- COALESCE(a.names,'') AS aliases,
  rs.*,COALESCE(ls.total_likes,0) AS total_likes,COALESCE(cs.total_comments,0) AS total_comments
  FROM courses c JOIN faculties f USING(faculty_id) JOIN universities u ON u.university_id=c.university_id
  LEFT JOIN LATERAL (SELECT json_agg(json_build_object('instructor_id',i.instructor_id,'name',i.name,'affiliation',i.affiliation) ORDER BY i.name,i.instructor_id) AS instructors,string_agg(i.name,' ') AS names
  FROM course_instructors ci JOIN instructors i USING(instructor_id) WHERE ci.course_id=c.course_id) i ON TRUE
  LEFT JOIN LATERAL (SELECT json_agg(x ORDER BY x.review_count DESC,x.tag_id) AS tags,string_agg(x.tag_name,' ') AS names FROM
  (SELECT t.tag_id,t.tag_name,COUNT(*) AS review_count FROM reviews r JOIN review_tags rt USING(review_id) JOIN tags t USING(tag_id) WHERE r.course_id=c.course_id AND r.status='ACTIVE' GROUP BY t.tag_id,t.tag_name) x) t ON TRUE
- LEFT JOIN LATERAL (SELECT string_agg(course_code || ' ' || course_name,' ') AS names FROM course_aliases WHERE canonical_course_id=c.course_id) a ON TRUE
  CROSS JOIN LATERAL (SELECT COUNT(*) AS review_count,COUNT(DISTINCT reviewer_id) AS reviewer_count,
  """ + ','.join(f'ROUND(AVG(rating_{a}),2) AS avg_{a}' for a in ASPECTS) + """
  FROM reviews r WHERE r.course_id=c.course_id AND r.status='ACTIVE') rs
@@ -60,9 +58,9 @@ class CourseRepository:
         terms=self._plain_terms(query)
         prefix=' & '.join(f'{t}:*' for t in terms)
         sql="WITH base AS ("+COURSE_ROWS+" WHERE "+where+"""), docs AS (
-          SELECT b.*,concat_ws(' ',course_code,course_name,instructor_names,tag_names,department,aliases) AS search_text,
+          SELECT b.*,concat_ws(' ',course_code,course_name,instructor_names,tag_names,department) AS search_text,
           setweight(to_tsvector('simple',course_code || ' ' || course_name || ' ' || instructor_names),'A') ||
-          setweight(to_tsvector('simple',tag_names || ' ' || aliases),'B') || setweight(to_tsvector('simple',department),'C') AS search_document FROM base b
+          setweight(to_tsvector('simple',tag_names),'B') || setweight(to_tsvector('simple',department),'C') AS search_document FROM base b
         ), q AS (SELECT %s::text AS raw,websearch_to_tsquery('simple',%s) AS web,
         CASE WHEN %s='' THEN NULL ELSE to_tsquery('simple',%s) END AS prefix,%s::text[] AS terms), matches AS (
         SELECT c.*,CASE WHEN lower(course_code)=lower(q.raw) AND q.raw<>'' THEN 100

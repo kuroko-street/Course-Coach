@@ -115,7 +115,7 @@ export default function Plans() {
           {plans.map((p) => (
             <div key={p.plan_id} className="card plan-card">
               <Link to={`/plans/${p.plan_id}`} style={{ color: "inherit", textDecoration: "none", flex: 1 }}>
-                <strong>{p.plan_name}</strong>
+                <strong title={p.plan_name}>{p.plan_name}</strong>
                 <div className="meta">
                   {p.item_count} รายการ · {p.total_credits} หน่วยกิตประมาณ (รหัสซ้ำในเทอมเดียวกันนับครั้งเดียว)
                 </div>

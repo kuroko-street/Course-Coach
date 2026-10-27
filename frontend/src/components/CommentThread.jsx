@@ -4,6 +4,7 @@ import {api} from '../api.js';
 import {useAuth} from '../AuthContext.jsx';
 import {loginPath} from './CourseUI.jsx';
 import ActionMenu from './ActionMenu.jsx';
+import ExpandableText from './ExpandableText.jsx';
 import {ConfirmDialog} from './Modal.jsx';
 import {useToast} from './ToastProvider.jsx';
 
@@ -25,10 +26,10 @@ export default function CommentThread({basePath,onChanged,onCourseError}){
   return <div className="comments-list ux-comments">
     {loading?<p role="status" className="ux-comments-empty">กำลังโหลดความคิดเห็น…</p>:!items.length&&!error&&<p className="ux-comments-empty">ยังไม่มีความคิดเห็น เริ่มพูดคุยเกี่ยวกับเนื้อหานี้ได้เลย</p>}
     {items.map(c=><article className="ux-comment" key={c.comment_id}>
-      <div className="ux-comment-heading"><div><Link to={`/profile/${c.author_id}`}>{c.author_name}</Link><time className="cc-date" dateTime={c.created_at+'Z'}>{new Date(c.created_at+'Z').toLocaleDateString('th-TH')}</time></div>
+      <div className="ux-comment-heading"><div><Link title={c.author_name} to={`/profile/${c.author_id}`}>{c.author_name}</Link><time className="cc-date" dateTime={c.created_at+'Z'}>{new Date(c.created_at+'Z').toLocaleDateString('th-TH')}</time></div>
         {user&&<ActionMenu label={`ตัวเลือกความคิดเห็นของ ${c.author_name}`}>{user.user_id===c.author_id?<><button type="button" disabled={busy} onClick={()=>{setEditing(c.comment_id);setEditText(c.content);}}>แก้ไขความคิดเห็น</button><button type="button" className="ux-danger" disabled={busy} onClick={()=>{setError('');setConfirm({type:'delete',id:c.comment_id});}}>ลบความคิดเห็น</button></>:<button type="button" disabled={busy||reported.includes(c.comment_id)} onClick={()=>{setError('');setConfirm({type:'report',id:c.comment_id});}}>{reported.includes(c.comment_id)?'รายงานแล้ว':'รายงานความคิดเห็น'}</button>}</ActionMenu>}
       </div>
-      {editing===c.comment_id?<form className="ux-comments-form" onSubmit={e=>{e.preventDefault();action(`${basePath}/comments/${c.comment_id}`,'PUT',{content:editText.trim()},()=>setEditing(null));}}><label>แก้ไขความคิดเห็น<textarea ref={editRef} required rows={2} maxLength={2000} disabled={busy} value={editText} onChange={e=>setEditText(e.target.value)}/></label><div className="cc-actions"><button type="button" className="btn-ghost" disabled={busy} onClick={()=>setEditing(null)}>ยกเลิก</button><button disabled={busy||!editText.trim()}>บันทึกการแก้ไข</button></div></form>:<p className="cc-secondary-content">{c.content}</p>}
+      {editing===c.comment_id?<form className="ux-comments-form" onSubmit={e=>{e.preventDefault();action(`${basePath}/comments/${c.comment_id}`,'PUT',{content:editText.trim()},()=>setEditing(null));}}><label>แก้ไขความคิดเห็น<textarea ref={editRef} required rows={2} maxLength={2000} disabled={busy} value={editText} onChange={e=>setEditText(e.target.value)}/></label><div className="cc-actions"><button type="button" className="btn-ghost" disabled={busy} onClick={()=>setEditing(null)}>ยกเลิก</button><button disabled={busy||!editText.trim()}>บันทึกการแก้ไข</button></div></form>:<ExpandableText text={c.content} limit={200} className="cc-secondary-content"/>}
     </article>)}
     {error&&!confirm&&<p role="alert" className="alert alert-error">{error}</p>}
     {user?<form className="ux-comments-form" onSubmit={e=>{e.preventDefault();action(`${basePath}/comments`,'POST',{content:text.trim()},()=>setText(''));}}><label>แสดงความคิดเห็น<textarea value={text} required maxLength={2000} rows={2} disabled={busy} onChange={e=>setText(e.target.value)} placeholder="พูดคุยหรือสอบถามเกี่ยวกับเนื้อหานี้…"/></label><button disabled={busy||!text.trim()}>{busy?'กำลังบันทึก…':'ส่งความคิดเห็น'}</button></form>:<Link to={loginPath(location.pathname+location.search)}>เข้าสู่ระบบเพื่อแสดงความคิดเห็น</Link>}

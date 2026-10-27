@@ -9,15 +9,15 @@ export const teacherNames=(items=[])=>items.map(item=>typeof item==='string'?ite
 export const loginPath=path=>`/login?next=${encodeURIComponent(path)}`;
 export const courseSubtitle=course=>course?`${course.course_code} · ${course.course_name} · ${course.academic_year} / ${semesterLabel(course.semester)}`:'';
 export function CourseContext({course}){
-  return <div className="cc-context"><span>ปี {course.academic_year||'–'} · {semesterLabel(course.semester)} · {course.credits??'–'} หน่วยกิต</span><span>ผู้สอน: {teacherNames(course.instructors)||'–'}</span></div>;
+  return <div className="cc-context"><span>ปี {course.academic_year||'–'} · {semesterLabel(course.semester)} · {course.credits??'–'} หน่วยกิต</span><span title={teacherNames(course.instructors)}>ผู้สอน: {teacherNames(course.instructors)||'–'}</span></div>;
 }
 export function CourseCard({course}){
   const location=useLocation();const score=course.avg_satisfaction??course.avg_rating??course.averages?.avg_satisfaction;
   const count=Number(course.review_count??course.averages?.review_count)||0;
   return <Link to={`/course/${course.course_id}`} state={{from:location.pathname+location.search}} className="card course-card ux-course-card">
     <div className="ux-card-top"><span className="ux-card-code">{course.course_code}</span><span className="ux-term-pill">{course.academic_year} · {semesterLabel(course.semester)}</span></div>
-    <strong className="ux-card-title">{course.course_name}</strong><div className="meta">{course.faculty_name||course.faculty} · {course.department_name||course.department}</div>
-    <div className="cc-context"><span>ผู้สอน: {teacherNames(course.instructors)||'–'}</span><span>{course.credits??'–'} หน่วยกิต</span></div>
+    <strong className="ux-card-title" title={course.course_name}>{course.course_name}</strong><div className="meta">{course.faculty_name||course.faculty} · {course.department_name||course.department}</div>
+    <div className="cc-context"><span title={teacherNames(course.instructors)}>ผู้สอน: {teacherNames(course.instructors)||'–'}</span><span>{course.credits??'–'} หน่วยกิต</span></div>
     <div className="tag-chips">{(course.tags||[]).slice(0,3).map(tag=><span className="tag-chip tag-chip-static" key={tag.tag_id||tag}>#{tag.tag_name||tag}</span>)}</div>
     <div className="ux-card-footer"><div className="ux-card-rating">{score!=null?<><div className="ux-card-score"><svg className="ux-card-star" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z"/></svg><strong>{Number(score).toFixed(2)}</strong><span>/ 5</span></div></>:null}<div className="meta ux-card-rating-caption">{score!=null?'ความพึงพอใจ':'ยังไม่มีคะแนน'} · <span className="ux-card-review-count">{count} รีวิว</span></div></div><svg className="ux-card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
   </Link>;

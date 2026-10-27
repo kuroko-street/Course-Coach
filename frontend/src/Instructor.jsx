@@ -1,3 +1,4 @@
+import ExpandableText from './components/ExpandableText.jsx';
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "./api.js";
@@ -48,7 +49,7 @@ export default function Instructor() {
       <section className="profile-header">
         <InstructorAvatar size={64} />
         <div>
-          <h1 className="course-title">{instructor.name}</h1>
+          <h1 className="course-title" title={instructor.name}>{instructor.name}</h1>
           <span className="muted small">โปรไฟล์อาจารย์</span>
         </div>
       </section>
@@ -56,7 +57,7 @@ export default function Instructor() {
       {instructor.bio && (
         <section>
           <div className="card">
-            <p>{instructor.bio}</p>
+            <ExpandableText text={instructor.bio} limit={500}/>
           </div>
         </section>
       )}
@@ -71,7 +72,7 @@ export default function Instructor() {
               <Link to={`/course/${c.course_id}`} key={c.course_id} className="card enrollment-card">
                 <div>
                   <span className="badge">{c.course_code}</span>
-                  <strong>{c.course_name}</strong>
+                  <strong title={c.course_name}>{c.course_name}</strong>
                   <div className="meta">{c.department}</div>
                   <CourseContext course={c}/>
                 </div>

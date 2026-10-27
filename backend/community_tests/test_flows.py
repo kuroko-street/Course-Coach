@@ -209,7 +209,9 @@ class CommunityFlows(unittest.TestCase):
         self.assertEqual(self.detail()['review_count'],2);self.assertEqual(self.detail(source)['course_id'],self.course)
         self.assertEqual(self.sql('SELECT status,report_count FROM reviews WHERE review_id=%s',(hidden,))[0],('HIDDEN',5))
         self.assertEqual(self.call('get',f'/summary-files/{fid}/download',2).status_code,200)
-        self.assertEqual(self.call('get','/courses',params={'search':'Typo'}).json()['courses'][0]['course_id'],self.course)
+        self.assertEqual(self.call('get','/courses',params={'search':'Typo'}).json()['total'],0)
+        self.assertEqual(self.call('get','/courses',params={'search':'Introduction Computer'}).json()['courses'][0]['course_id'],self.course)
+        self.assertEqual(self.sql('SELECT canonical_course_id FROM course_aliases WHERE source_course_id=%s',(source,))[0][0],self.course)
         self.assertEqual(self.call('get','/courses').json()['total'],1)
 
     def test_merge_stale_idempotent_unauthorized(self):
@@ -259,7 +261,7 @@ class CommunityFlows(unittest.TestCase):
         self.assertEqual(self.merge(body).status_code,200)
         self.assertEqual(self.merge(self.merge_body(middle)).status_code,200)
         self.assertEqual(self.detail(source)['course_id'],self.course)
-        self.assertEqual(self.call('get','/courses',params={'search':'Oldest alias'}).json()['courses'][0]['course_id'],self.course)
+        self.assertEqual(self.call('get','/courses',params={'search':'Oldest alias'}).json()['total'],0)
         self.assertEqual(self.sql('SELECT status,report_count FROM summary_files WHERE file_id=%s',(fid,))[0],('HIDDEN',5))
         self.assertEqual(self.call('get',f'/summary-files/{fid}/download',2).status_code,404)
 
