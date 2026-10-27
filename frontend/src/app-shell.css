@@ -1254,8 +1254,10 @@ button[aria-pressed="true"] .review-heart { fill: currentColor; }
 .admin-courses-page .admin-review-conflict select:focus-visible { outline: 2px solid #c54308; outline-offset: 2px; }
 .admin-courses-page .admin-review-strategy .admin-review-strategy-hint { margin: 10px 0 0; color: #647185; font-size: 13px; }
 .admin-courses-page .admin-review-conflict label { display: block; margin-top: 8px; font-weight: 600; }
-.admin-courses-page .admin-review-conflict select { display: block; width: 100%; max-width: 560px; min-width: 0; min-height: 44px; margin-top: 8px; padding: 10px 38px 10px 12px; border: 1px solid #d7dfe8; border-radius: 10px; appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%23647185' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center / 16px; color: #26364b; font-weight: 400; white-space: nowrap; text-overflow: ellipsis; }
-.admin-courses-page .admin-review-conflict select::picker-icon { display: none; }
+.admin-courses-page .admin-review-conflict select { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; max-width: 560px; min-width: 0; min-height: 44px; margin-top: 8px; padding: 10px 12px; border: 1px solid #d7dfe8; border-radius: 10px; background: #fff; color: #26364b; font-weight: 400; white-space: nowrap; }
+.admin-courses-page .admin-review-conflict select::picker-icon { flex-shrink: 0; margin-left: auto; }
+.admin-courses-page .admin-review-conflict select option { white-space: nowrap; }
+.admin-courses-page .admin-review-conflict .admin-review-selected-meta { margin: 10px 0 0; color: #647185; font-size: 13px; }
 .admin-courses-page .admin-review-conflict .admin-review-selected-content { max-width: 70ch; margin: 12px 0; padding: 10px 12px; border-left: 3px solid #efb694; background: #fff8f2; color: #38475b; white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin-courses-page .admin-review-conflict .admin-review-archive-note { margin-bottom: 0; color: #647185; font-size: 13px; }
 @media (max-width: 650px) {
