@@ -44,19 +44,26 @@ export default function CourseDetail({listMode=null}){
     }catch(e){if(currentRoute.current===routeKey)setError('รายการอาจบันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ: '+e.message);}
   },[id,routeKey,listMode,from,navigate,refreshPermissions]);
   useEffect(()=>{
-    const controller=new AbortController();setLoading(true);setReviewsLoading(true);setFilesLoading(true);
-    setCourse(null);setReviews([]);setFiles([]);setError('');setReviewError('');setFileError('');setDialog(null);
+    const controller=new AbortController();setLoading(true);
+    setCourse(null);setError('');setDialog(null);
     api(`/courses/${id}`,{signal:controller.signal}).then(c=>{
       if(controller.signal.aborted)return;
       if(c.redirected_from){navigate(`/course/${c.course_id}${listMode==='files'?'/summary-files':listMode==='reviews'?'/reviews':''}`,{replace:true,state:{from}});return;}
       setCourse(c);
     }).catch(e=>{if(e.name!=='AbortError')setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return()=>controller.abort();
+  },[id,listMode,retry]);
+  useEffect(()=>{
+    setReviewsLoading(true);setFilesLoading(true);
+    setReviews([]);setFiles([]);setReviewError('');setFileError('');
+    if(!authReady)return;
+    const controller=new AbortController();
     api(`/courses/${id}/reviews`,{signal:controller.signal}).then(r=>{if(!controller.signal.aborted)setReviews(r.reviews);})
       .catch(e=>{if(e.name!=='AbortError')setReviewError(e.message);}).finally(()=>{if(!controller.signal.aborted)setReviewsLoading(false);});
     api(`/courses/${id}/summary-files`,{signal:controller.signal}).then(f=>{if(!controller.signal.aborted)setFiles(f.files);})
       .catch(e=>{if(e.name!=='AbortError')setFileError(e.message);}).finally(()=>{if(!controller.signal.aborted)setFilesLoading(false);});
     return()=>controller.abort();
-  },[id,user?.user_id,listMode,retry]);
+  },[id,user?.user_id,authReady,retry]);
   useEffect(()=>{
     if(user&&course&&permissions&&params.get('review')==='1'){
       if(permissions.review.can_create||ownReview)setDialog('review');
