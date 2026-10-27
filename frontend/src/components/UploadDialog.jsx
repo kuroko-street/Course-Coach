@@ -25,6 +25,12 @@ export default function UploadDialog({courseId,course,quota,onClose,onSaved,onCo
         patch(row.id,{status:'uploading',attempted:true});
         try{await apiUploadMany(`/courses/${courseId}/summary-files`,{files:[row.file],fields:{upload_request_id:row.id}});patch(row.id,{status:'success'});uploaded++;}catch(e){if(await onCourseError?.(e))return;patch(row.id,{status:'failed',error:e.message});failed++;}
       }
+      if(uploaded&&!failed){
+        toast.success('อัปโหลดไฟล์แล้ว',`${uploaded} ไฟล์ถูกเพิ่มในรายวิชา`);
+        onClose();
+        void Promise.resolve().then(()=>onSaved?.()).then(refreshed=>{if(refreshed===null)toast.error('โหลดรายการไฟล์ล่าสุดไม่สำเร็จ','ลองโหลดหน้าวิชาใหม่');}).catch(()=>toast.error('โหลดรายการไฟล์ล่าสุดไม่สำเร็จ','ลองโหลดหน้าวิชาใหม่'));
+        return;
+      }
       if(await onSaved?.()===false)return;
       if(uploaded)toast.success('อัปโหลดไฟล์แล้ว',`${uploaded} ไฟล์ถูกเพิ่มในรายวิชา`);
       if(failed)toast.error('บางไฟล์อัปโหลดไม่สำเร็จ',`ตรวจรายการที่มีข้อผิดพลาด ${failed} ไฟล์`);
