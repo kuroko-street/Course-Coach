@@ -83,18 +83,20 @@ export default function Plans() {
 
   return (
     <section className="plans-page">
+      <div className="ux-page-heading"><div>
       <h1>แผนการเรียนของฉัน</h1>
       <p className="muted">
         วางแผนวิชาและหน่วยกิตล่วงหน้าก่อนลงทะเบียนเรียนจริง
       </p>
-
-      {error && <div className="alert alert-error">{error}</div>}
-
+      </div>
       <div className="plan-create-form">
         <button className="btn-primary" type="button" onClick={handleCreate} disabled={creating || loading}>
           {creating ? "กำลังสร้าง…" : "+ สร้างแผน"}
         </button>
       </div>
+      </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
         <p className="muted">กำลังโหลดแผนการเรียน…</p>

@@ -40,7 +40,7 @@ export default function Instructor() {
   const { instructor, courses } = data;
 
   return (
-    <>
+    <section className="instructor-page">
       <Link to="/" className="back-link">
         ← กลับไปหน้ารายวิชา
       </Link>
@@ -80,6 +80,6 @@ export default function Instructor() {
           </div>
         )}
       </section>
-    </>
+    </section>
   );
 }

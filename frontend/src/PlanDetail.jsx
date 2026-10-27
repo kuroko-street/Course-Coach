@@ -183,7 +183,7 @@ export default function PlanDetail() {
   }
 
   return (
-    <>
+    <section className="plan-detail-page">
       <Link to="/plans" className="back-link">
         ← กลับไปหน้าแผนการเรียน
       </Link>
@@ -209,7 +209,7 @@ export default function PlanDetail() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <section>
+      <section className="plan-add-section">
         <h2>เพิ่มวิชาลงแผน</h2>
         <p className="cc-info">แผนส่วนตัวเท่านั้น ปี/เทอมเป้าหมายด้านล่างแยกจากปี/เทอมของรายการที่ใช้อ้างอิง ไม่ตรวจสิทธิ์ลงทะเบียน วิชาที่เคยผ่าน หรือรับรองว่ามีการเปิดสอนจริง</p>
         <div className="card course-picker">
@@ -301,7 +301,7 @@ export default function PlanDetail() {
         </div>
       </section>
 
-      <section>
+      <section className="plan-table-section">
         <h2>ตารางแผนการเรียน</h2>
         {plan.terms.length === 0 ? (
           <p className="muted">ยังไม่มีวิชาในแผนนี้ — เพิ่มวิชาแรกด้านบน</p>
@@ -372,6 +372,6 @@ export default function PlanDetail() {
           ))
         )}
       </section>
-    </>
+    </section>
   );
 }
