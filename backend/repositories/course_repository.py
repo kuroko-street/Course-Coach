@@ -85,16 +85,24 @@ class CourseRepository:
             rows=cur.fetchall()
         return dict(courses=rows,total=total,page=page,page_size=page_size)
 
-    def get_detail(self,conn,course_id):
+    def resolve_active_course_id(self,conn,course_id):
+        """Resolve merge redirects without loading course statistics and tags."""
         with dict_cursor(conn) as cur:
-            cur.execute('SELECT course_id,merged_into_course_id FROM courses WHERE course_id=%s',(course_id,)); original=cur.fetchone()
+            cur.execute('SELECT course_id,merged_into_course_id,is_active FROM courses WHERE course_id=%s',(course_id,)); original=cur.fetchone()
             if original is None: return None
             visited=set()
             while original['merged_into_course_id']:
                 if original['course_id'] in visited: raise ServiceError(409,'Course redirect cycle')
                 visited.add(original['course_id'])
-                cur.execute('SELECT course_id,merged_into_course_id FROM courses WHERE course_id=%s',(original['merged_into_course_id'],)); original=cur.fetchone()
-            cur.execute(COURSE_ROWS+' WHERE c.course_id=%s AND c.is_active AND c.merged_into_course_id IS NULL',(original['course_id'],))
+                cur.execute('SELECT course_id,merged_into_course_id,is_active FROM courses WHERE course_id=%s',(original['merged_into_course_id'],)); original=cur.fetchone()
+                if original is None: return None
+        return original['course_id'] if original['is_active'] else None
+
+    def get_detail(self,conn,course_id):
+        canonical_id=self.resolve_active_course_id(conn,course_id)
+        if canonical_id is None: return None
+        with dict_cursor(conn) as cur:
+            cur.execute(COURSE_ROWS+' WHERE c.course_id=%s AND c.is_active AND c.merged_into_course_id IS NULL',(canonical_id,))
             row=cur.fetchone()
         if row:
             row['averages']={key:row[key] for key in ['review_count',*(f'avg_{a}' for a in ASPECTS)]}
@@ -102,8 +110,8 @@ class CourseRepository:
         return row
 
     def list_reviews(self,conn,course_id,caller_id=None):
-        course=self.get_detail(conn,course_id)
-        if not course: raise ServiceError(404,'Course not found')
+        canonical_id=self.resolve_active_course_id(conn,course_id)
+        if canonical_id is None: raise ServiceError(404,'Course not found')
         with dict_cursor(conn) as cur:
             cur.execute(f"""SELECT {REVIEW_FIELDS},COALESCE(NULLIF(u.display_name,''),u.username) AS reviewer_name,u.avatar_url AS reviewer_avatar,
             (SELECT COUNT(*) FROM review_likes l WHERE l.review_id=r.review_id) AS like_count,
@@ -111,7 +119,7 @@ class CourseRepository:
             EXISTS(SELECT 1 FROM review_likes l WHERE l.review_id=r.review_id AND l.user_id=%s) AS liked_by_me,
             EXISTS(SELECT 1 FROM review_reports rp WHERE rp.review_id=r.review_id AND rp.reporter_id=%s) AS reported_by_me,
             COALESCE((SELECT json_agg(t ORDER BY t.tag_id) FROM review_tags rt JOIN tags t USING(tag_id) WHERE rt.review_id=r.review_id),'[]'::json) AS tags
-            FROM reviews r JOIN users u ON u.user_id=r.reviewer_id WHERE r.course_id=%s AND r.status='ACTIVE' ORDER BY r.created_at DESC,r.review_id DESC""",(caller_id,caller_id,course['course_id']))
+            FROM reviews r JOIN users u ON u.user_id=r.reviewer_id WHERE r.course_id=%s AND r.status='ACTIVE' ORDER BY r.created_at DESC,r.review_id DESC""",(caller_id,caller_id,canonical_id))
             return cur.fetchall()
 
     def get_instructor_profile(self,conn,instructor_id):

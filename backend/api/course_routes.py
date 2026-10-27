@@ -52,9 +52,9 @@ def contribution_status(course_id:int,user:dict=Depends(require_user)):
     try:
         # Read the active content and cooldowns from one consistent database snapshot.
         conn.set_session(isolation_level='REPEATABLE READ',readonly=True)
-        course=CourseRepository().get_detail(conn,course_id)
-        if not course: raise HTTPException(404,'ไม่พบรายวิชา')
-        return ContributionRepository().status(conn,course['course_id'],user['user_id'])
+        canonical_id=CourseRepository().resolve_active_course_id(conn,course_id)
+        if canonical_id is None: raise HTTPException(404,'ไม่พบรายวิชา')
+        return ContributionRepository().status(conn,canonical_id,user['user_id'])
     finally: conn.close()
 @router.get('/instructors/{instructor_id}/profile')
 def instructor_profile(instructor_id:int): return invoke(service.instructor_profile,instructor_id)
