@@ -1244,6 +1244,19 @@ button[aria-pressed="true"] .review-heart { fill: currentColor; }
 .admin-courses-page .admin-merge-editor > .cc-info fieldset { min-width: 0; margin: 20px 0; padding: 18px; border: 1px solid #dfe5ec; border-radius: 12px; background: #fff; }
 .admin-courses-page .admin-merge-editor > .cc-info legend { max-width: 100%; padding: 0 8px; color: #38475b; font-weight: 600; overflow-wrap: anywhere; }
 .admin-courses-page .admin-merge-editor > .cc-info button { border-radius: 10px; min-height: 44px; padding: 10px 18px; }
+.admin-courses-page .admin-review-strategy { margin-top: 24px; }
+.admin-courses-page .admin-review-strategy h4 { margin: 0 0 4px; color: #26364b; font-size: 17px; }
+.admin-courses-page .admin-review-strategy > p { margin: 4px 0 12px; }
+.admin-courses-page .admin-review-strategy-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-courses-page .admin-review-strategy-options button { min-height: 40px; padding: 8px 15px; background: #fff; border: 1px solid #d7dfe8; color: #38475b; font-weight: 600; }
+.admin-courses-page .admin-review-strategy-options button.is-active { background: #fff2e9; border-color: #c54308; color: #9f350a; }
+.admin-courses-page .admin-review-strategy-options button:focus-visible,
+.admin-courses-page .admin-review-conflict select:focus-visible { outline: 2px solid #c54308; outline-offset: 2px; }
+.admin-courses-page .admin-review-strategy .admin-review-strategy-hint { margin: 10px 0 0; color: #647185; font-size: 13px; }
+.admin-courses-page .admin-review-conflict label { display: block; margin-top: 8px; font-weight: 600; }
+.admin-courses-page .admin-review-conflict select { display: block; width: 100%; max-width: 560px; min-width: 0; margin-top: 8px; padding: 10px 12px; border: 1px solid #d7dfe8; border-radius: 10px; background: #fff; color: #26364b; font-weight: 400; }
+.admin-courses-page .admin-review-conflict .admin-review-selected-content { max-width: 70ch; margin: 12px 0; padding: 10px 12px; border-left: 3px solid #efb694; background: #fff8f2; color: #38475b; white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-courses-page .admin-review-conflict .admin-review-archive-note { margin-bottom: 0; color: #647185; font-size: 13px; }
 @media (max-width: 650px) {
   .admin-courses-page .admin-merge-editor > .cc-form-grid,
   .admin-courses-page .admin-merge-editor > .cc-info { padding: 16px; }

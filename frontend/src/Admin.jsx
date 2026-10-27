@@ -5,6 +5,7 @@ import CourseForm,{coursePayload,numericPayload} from './components/CourseForm.j
 import {CatalogFilters,CourseContext,useCatalogOptions} from './components/CourseUI.jsx';
 import {useToast} from './components/ToastProvider.jsx';
 import {ConfirmDialog} from './components/Modal.jsx';
+import {reviewChoicesForStrategy} from './mergeReviewSelection.js';
 
 const FIELD_LABELS={course_code:'รหัส',course_name:'ชื่อวิชา',faculty_id:'คณะ',department_id:'สาขา',academic_year:'ปี',semester:'เทอม',credits:'หน่วยกิต',instructor_ids:'ชุดผู้สอน',syllabus:'คำอธิบาย',additional_details:'รายละเอียดเพิ่มเติม'};
 export default function Admin(){
@@ -17,13 +18,13 @@ export default function Admin(){
   const [data,setData]=useState({courses:[],total:0});const [selected,setSelected]=useState([]);const [mode,setMode]=useState(null);
   const [primary,setPrimary]=useState(null);const [form,setForm]=useState(coursePayload());const [copiedFrom,setCopiedFrom]=useState({});const [reason,setReason]=useState('');const [keep,setKeep]=useState([]);
   const [preview,setPreview]=useState(null);const [requestId,setRequestId]=useState('');const [history,setHistory]=useState([]);
-  const [keepReviews,setKeepReviews]=useState([]);const [acceptOverage,setAcceptOverage]=useState(false);
+  const [keepReviews,setKeepReviews]=useState([]);const [reviewSelectionMode,setReviewSelectionMode]=useState('manual');const [acceptOverage,setAcceptOverage]=useState(false);
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [refresh,setRefresh]=useState(0);
   const qs=new URLSearchParams({search,code,page,page_size:50});Object.entries(filters).forEach(([k,v])=>{if(Array.isArray(v))v.forEach(x=>qs.append(k,x));else if(v!=='')qs.set(k,v);});const query=qs.toString();
   useEffect(()=>{const controller=new AbortController();const timer=setTimeout(()=>{api(`/admin/courses?${query}`,{signal:controller.signal}).then(setData).catch(err=>{if(err.name!=='AbortError')setError(err.message);});},250);return()=>{clearTimeout(timer);controller.abort();};},[query,refresh]);
   useEffect(()=>{api('/admin/merge-history').then(r=>setHistory(r.history)).catch(err=>setError(err.message));},[refresh]);
   function pick(c){if(selected.some(x=>x.course_id===c.course_id))setSelected(prev=>prev.filter(x=>x.course_id!==c.course_id));else if(selected.length<21)setSelected(prev=>[...prev,c]);else toast.info('เลือกได้สูงสุด 21 รายการต่อครั้ง');}
-  function start(nextMode,c){setMode(nextMode);setPrimary(c.course_id);setForm(coursePayload(c));setCopiedFrom({});setPreview(null);setKeep([]);setKeepReviews([]);setAcceptOverage(false);setReason('');setError('');}
+  function start(nextMode,c){setMode(nextMode);setPrimary(c.course_id);setForm(coursePayload(c));setCopiedFrom({});setPreview(null);setKeep([]);setKeepReviews([]);setReviewSelectionMode('manual');setAcceptOverage(false);setReason('');setError('');}
   function editForm(next){
     if(mode==='merge')setCopiedFrom(prev=>{
       const updated={...prev};
@@ -37,8 +38,34 @@ export default function Admin(){
   async function save(e){e.preventDefault();setBusy(true);setError('');try{
     if(!form.instructor_ids.length)throw new Error('เลือกผู้สอนอย่างน้อยหนึ่งคน');
     if(mode==='edit'){await api(`/admin/courses/${primary}`,{method:'PUT',body:numericPayload(form)});setMode(null);setSelected([]);setRefresh(x=>x+1);toast.success('บันทึกข้อมูลวิชาแล้ว');}
-    else{const result=await api('/admin/courses/merge/preview',{method:'POST',body:mergeBody()});setPreview(result);setRequestId(crypto.randomUUID());}
+    else{
+      const body=mergeBody();
+      let result=await api('/admin/courses/merge/preview',{method:'POST',body});
+      if(reviewSelectionMode!=='manual'){
+        const choices=reviewChoicesForStrategy(result.review_conflicts,reviewSelectionMode,primary);
+        if(JSON.stringify(choices.slice().sort((a,b)=>a-b))!==JSON.stringify(body.keep_review_ids.slice().sort((a,b)=>a-b))){
+          result=await api('/admin/courses/merge/preview',{method:'POST',body:{...body,keep_review_ids:choices}});
+        }
+        setKeepReviews(choices);
+      }
+      setPreview(result);setRequestId(crypto.randomUUID());
+    }
   }catch(err){setError(err.message);}finally{setBusy(false);}}
+  async function chooseReviewStrategy(nextStrategy){
+    if(nextStrategy==='manual'){setReviewSelectionMode('manual');return;}
+    const choices=reviewChoicesForStrategy(preview.review_conflicts,nextStrategy,primary);
+    if(JSON.stringify(choices.slice().sort((a,b)=>a-b))===JSON.stringify(keepReviews.slice().sort((a,b)=>a-b)) && !preview.stale){setReviewSelectionMode(nextStrategy);return;}
+    setBusy(true);setError('');
+    try{
+      const result=await api('/admin/courses/merge/preview',{method:'POST',body:{...mergeBody(),keep_review_ids:choices}});
+      setKeepReviews(choices);setReviewSelectionMode(nextStrategy);setPreview(result);setRequestId(crypto.randomUUID());
+    }catch(err){setError(err.message);}finally{setBusy(false);}
+  }
+  function chooseReview(conflict,reviewId){
+    setReviewSelectionMode('manual');
+    setKeepReviews(prev=>[...prev.filter(id=>!conflict.reviews.some(review=>review.review_id===id)),reviewId]);
+    setPreview(prev=>({...prev,stale:true}));
+  }
   async function confirm(){setBusy(true);setError('');try{
     const result=await api('/admin/courses/merge',{method:'POST',body:{...mergeBody(),preview_token:preview.preview_token,request_id:requestId}});
     setMergeConfirmOpen(false);toast.success('รวมรายวิชาแล้ว',`รายการหลัก #${result.course_id} · ประวัติ #${result.merge_id}`);setMode(null);setSelected([]);setRefresh(x=>x+1);
@@ -51,13 +78,14 @@ export default function Admin(){
     {(error || optionsError)&&<p className="alert alert-error" role="alert">{error || optionsError}</p>}
     {mode&&options?<form className={`card admin-course-editor ${mode==='merge'?'admin-merge-editor':''}`} onSubmit={save}>
       <h2>{mode==='merge'?'รวมรายการวิชา':'แก้ข้อมูลรายวิชา'} #{primary}</h2>
-      {mode==='merge'&&<><label>รายการหลัก (ใช้ URL นี้ต่อ)<select value={primary} onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));setPrimary(c.course_id);setForm(coursePayload(c));setCopiedFrom({});setPreview(null);setKeep([]);}}>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} {c.course_code} {c.course_name} ({c.academic_year}/{c.semester})</option>)}</select></label><p>เลือกข้อมูลที่จะเก็บเป็นรายช่องจากวิชาอื่นที่เลือกไว้ หรือปรับในฟอร์มด้านล่าง ชุดผู้สอนไม่ถูกรวมอัตโนมัติ</p><div className="cc-form-grid">{Object.entries(FIELD_LABELS).map(([key,label])=><label key={key}>{label}: คัดลอกจาก<select value={copiedFrom[key]??primary} onChange={e=>copyField(key,e.target.value)} disabled={busy}><option value={primary}>#{primary} · {selectedPrimary?.course_name} (รายการหลัก)</option><option value="manual" disabled>ปรับเองในฟอร์ม</option>{selected.filter(c=>c.course_id!==primary).map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} · {c.course_name}</option>)}</select></label>)}</div></>}
+      {mode==='merge'&&<><label>รายการหลัก (ใช้ URL นี้ต่อ)<select value={primary} onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));setPrimary(c.course_id);setForm(coursePayload(c));setCopiedFrom({});setPreview(null);setKeep([]);setKeepReviews([]);setReviewSelectionMode('manual');}}>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} {c.course_code} {c.course_name} ({c.academic_year}/{c.semester})</option>)}</select></label><p>เลือกข้อมูลที่จะเก็บเป็นรายช่องจากวิชาอื่นที่เลือกไว้ หรือปรับในฟอร์มด้านล่าง ชุดผู้สอนไม่ถูกรวมอัตโนมัติ</p><div className="cc-form-grid">{Object.entries(FIELD_LABELS).map(([key,label])=><label key={key}>{label}: คัดลอกจาก<select value={copiedFrom[key]??primary} onChange={e=>copyField(key,e.target.value)} disabled={busy}><option value={primary}>#{primary} · {selectedPrimary?.course_name} (รายการหลัก)</option><option value="manual" disabled>ปรับเองในฟอร์ม</option>{selected.filter(c=>c.course_id!==primary).map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} · {c.course_name}</option>)}</select></label>)}</div></>}
       <CourseForm key={`${mode}-${primary}`} value={form} onChange={editForm} options={options} initialTeachers={mode==='merge'?selected.flatMap(c=>c.instructors):selectedPrimary?.instructors || []} disabled={busy}/>
       {mode==='merge'&&<label>เหตุผลที่ควรเป็นรายการเดียวกัน<textarea required minLength={5} maxLength={2000} value={reason} onChange={e=>{setReason(e.target.value);setPreview(null);}}/></label>}
       <div className="cc-actions"><button disabled={busy}>{busy?'กำลังตรวจสอบ…':mode==='merge'?'ตรวจผลกระทบก่อนรวม':'บันทึกการแก้ไข'}</button><button type="button" className="btn-ghost" disabled={busy} onClick={()=>setMode(null)}>ยกเลิก</button></div>
       {preview&&<div className="cc-info"><h3>ผลก่อนรวม</h3><p>รีวิว {preview.counts.reviews} · ไฟล์ {preview.counts.files} · รายการในแผน {preview.counts.plans}</p><p>เก็บผลงานและสถานะเดิม ไม่คืน HIDDEN หรือ DELETED กลับมาแสดง</p>{preview.warnings.map((w,i)=><p className="alert alert-error" key={i}>{w}</p>)}
         {preview.plan_conflicts.map(c=><fieldset key={`${c.plan_id}-${c.academic_year}-${c.semester}`}><legend>แผน #{c.plan_id} ปี {c.academic_year} เทอม {c.semester}: เลือกเก็บหนึ่งรายการ</legend><p>รายการเหล่านี้จะกลายเป็นวิชาเดียวกันในเทอมเดียวกัน เก็บประวัติรายการที่ตัดซ้ำไว้ในบันทึกการรวม</p>{c.item_ids.map(id=><label key={id} style={{display:'block'}}><input type="radio" style={{width:'auto'}} name={`plan-${c.plan_id}-${c.academic_year}-${c.semester}`} checked={keep.includes(id)} onChange={()=>{setKeep(prev=>[...prev.filter(x=>!c.item_ids.includes(x)),id]);setPreview(prev=>({...prev,stale:true}));}}/> เก็บรายการ #{id}</label>)}</fieldset>)}
-        {preview.review_conflicts.map(c=><fieldset key={c.reviewer_id}><legend>บัญชี #{c.reviewer_id} มีรีวิวซ้ำหลังรวม: เลือกหนึ่งรีวิวให้แสดง</legend><p>รีวิวที่ไม่เลือกจะเป็น ARCHIVED เก็บข้อความ คะแนน ไลก์ ความคิดเห็นและรายงานไว้ในประวัติ แต่ไม่แสดงและไม่นับคะแนน/แท็ก</p>{c.reviews.map(r=><label key={r.review_id} style={{display:'block',marginBottom:12}}><input type="radio" style={{width:'auto'}} name={`review-${c.reviewer_id}`} checked={keepReviews.includes(r.review_id)} onChange={()=>{setKeepReviews(prev=>[...prev.filter(id=>!c.reviews.some(x=>x.review_id===id)),r.review_id]);setPreview(prev=>({...prev,stale:true}));}}/> รีวิว #{r.review_id} จากวิชา #{r.course_id} · พึงพอใจ {r.rating_satisfaction} / 5<p className="cc-secondary-content">{r.content}</p></label>)}</fieldset>)}
+        {preview.review_conflicts.length>0&&<div className="admin-review-strategy"><h4>รีวิวซ้ำหลังรวม</h4><p>เลือกวิธีเลือกว่ารีวิวไหนจะยังแสดงอยู่ต่อหนึ่งบัญชี</p><div className="admin-review-strategy-options" role="group" aria-label="วิธีเลือกรีวิวที่จะเก็บ">{[['latest','รีวิวใหม่ที่สุด'],['primary','วิชาหลักเป็นหลัก'],['manual','เลือกเอง']].map(([value,label])=><button key={value} type="button" className={reviewSelectionMode===value?'is-active':''} aria-pressed={reviewSelectionMode===value} disabled={busy} onClick={()=>chooseReviewStrategy(value)}>{label}</button>)}</div><p className="admin-review-strategy-hint">{reviewSelectionMode==='primary'?'ถ้าบัญชีใดไม่มีรีวิวในวิชาหลัก จะใช้รีวิวใหม่ที่สุดแทน':reviewSelectionMode==='manual'?'เลือกรีวิวที่จะแสดงสำหรับแต่ละบัญชีจากรายการด้านล่าง':'เทียบวันที่สร้างรีวิว หากวันเดียวกันใช้หมายเลขรีวิวล่าสุด'}</p></div>}
+        {preview.review_conflicts.map(c=>{const selectedReview=c.reviews.find(r=>keepReviews.includes(r.review_id));return <fieldset className="admin-review-conflict" key={c.reviewer_id}><legend>บัญชี #{c.reviewer_id} มีรีวิวซ้ำหลังรวม</legend><label>รีวิวที่จะแสดง<select value={selectedReview?.review_id??''} disabled={busy} onChange={e=>chooseReview(c,Number(e.target.value))}><option value="" disabled>เลือกรีวิว</option>{c.reviews.map(r=><option key={r.review_id} value={r.review_id}>รีวิว #{r.review_id} · วิชา #{r.course_id}{r.course_id===primary?' (วิชาหลัก)':''} · {new Date(r.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})} · พึงพอใจ {r.rating_satisfaction}/5</option>)}</select></label>{selectedReview&&<p className="admin-review-selected-content">{selectedReview.content}</p>}<p className="admin-review-archive-note">รีวิวอื่นจะเก็บในประวัติ โดยไม่แสดงและไม่นับคะแนนหรือแท็ก</p></fieldset>;})}
         {preview.file_overages.length>0&&<div><h4>ไฟล์รวมแล้วเกินโควต้า</h4>{preview.file_overages.map(c=><p key={c.user_id}>บัญชี #{c.user_id} · ใช้อยู่ {c.used} / พักสิทธิ์ {c.held}</p>)}<label><input type="checkbox" style={{width:'auto'}} checked={acceptOverage} onChange={e=>{setAcceptOverage(e.target.checked);setPreview(prev=>({...prev,stale:true}));}}/> ยืนยันเก็บไฟล์เดิมครบ ไม่ลบอัตโนมัติ และงดอัปเพิ่มจนมีช่องว่าง</label></div>}
         <p>การพักสิทธิ์ที่มีอยู่จะย้ายตามมาวิชาหลัก ไม่ถูกล้างจากการรวม</p>
         {preview.stale&&<p>ตัวเลือกเปลี่ยนแล้ว กด “ตรวจผลกระทบก่อนรวม” อีกครั้ง</p>}<button type="button" disabled={busy || preview.stale || !planChoicesComplete || !reviewChoicesComplete || (preview.file_overages.length>0&&!acceptOverage)} onClick={()=>setMergeConfirmOpen(true)}>ยืนยันรวมตามผลตรวจนี้</button>
