@@ -39,7 +39,12 @@ def require_user(
     request: Request,
     x_user_id: int | None = Header(default=None, alias="X-User-Id"),
 ):
-    user_id = _session_user_id(request, x_user_id)
+    # Read the account and its mock flag in one query. Previously the mock
+    # session check opened a separate remote DB connection on every request.
+    mock_enabled = mock_auth_enabled()
+    session_user_id = request.session.get("user_id")
+    header_login = session_user_id is None and x_user_id is not None and mock_enabled
+    user_id = session_user_id if session_user_id is not None else x_user_id if header_login else None
     if user_id is None:
         raise HTTPException(status_code=401, detail="Authentication required.")
     conn = get_connection()
@@ -50,7 +55,12 @@ def require_user(
     if user is None:
         request.session.clear()
         raise HTTPException(status_code=401, detail="Authenticated user no longer exists.")
-    return user
+    if (user["is_mock"] and not mock_enabled) or (header_login and not user["is_mock"]):
+        request.session.clear()
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    result = dict(user)
+    result.pop("is_mock")
+    return result
 
 
 def require_admin(user: dict = Depends(require_user)):
