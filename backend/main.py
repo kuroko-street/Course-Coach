@@ -6,8 +6,9 @@ assembles the application and exposes the health check.
 """
 import logging
 import os
+from time import perf_counter
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -47,6 +48,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def server_timing(request: Request, call_next):
+    started = perf_counter()
+    response = await call_next(request)
+    response.headers["Server-Timing"] = f"app;dur={(perf_counter() - started) * 1000:.1f}"
+    return response
 
 app.include_router(user_router)
 app.include_router(course_router)
