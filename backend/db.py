@@ -4,9 +4,41 @@ Connection parameters are read exclusively from environment variables so the
 same image runs unchanged in Docker Compose, CI, or locally.
 """
 import os
+import threading
 
 import psycopg2
 import psycopg2.extras
+from psycopg2.pool import PoolError, ThreadedConnectionPool
+
+
+_pool = None
+_pool_lock = threading.Lock()
+
+
+class _ConnectionLease:
+    """Keep the existing conn.close() contract while returning a clean pool slot."""
+
+    def __init__(self, pool, connection):
+        self._pool = pool
+        self._connection = connection
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+    def close(self):
+        if self._connection is None:
+            return
+        connection = self._connection
+        self._connection = None
+        try:
+            if not connection.closed:
+                # Read endpoints leave a transaction open; reset also clears
+                # set_session(readonly=True) before a writer borrows this slot.
+                connection.reset()
+        except Exception:
+            self._pool.putconn(connection, close=True)
+            return
+        self._pool.putconn(connection, close=bool(connection.closed))
 
 
 def get_db_config() -> dict:
@@ -20,13 +52,21 @@ def get_db_config() -> dict:
 
 
 def get_connection():
-    """Open a new psycopg2 connection.
+    """Borrow a connection, creating the process-local pool on first use.
 
-    autocommit is left at its default (False) so callers are in full control
-    of transaction boundaries via commit()/rollback().
+    autocommit stays off; callers still control commit()/rollback() and must
+    call close() when done. A full pool falls back to a one-off connection so
+    concurrent requests are not rejected merely because all slots are busy.
     """
-    conn = psycopg2.connect(**get_db_config())
-    return conn
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = ThreadedConnectionPool(1, 8, **get_db_config())
+    try:
+        return _ConnectionLease(_pool, _pool.getconn())
+    except PoolError:
+        return psycopg2.connect(**get_db_config())
 
 
 def dict_cursor(conn):
