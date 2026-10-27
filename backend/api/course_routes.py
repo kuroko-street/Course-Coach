@@ -45,7 +45,8 @@ def courses(search:str=Query('',max_length=300),page:int=Query(1,ge=1),page_size
 @router.get('/courses/{course_id}')
 def course(course_id:int): return invoke(service.detail,course_id)
 @router.get('/courses/{course_id}/reviews')
-def reviews(course_id:int,caller_id:int|None=Depends(optional_user_id)): return invoke(service.reviews,course_id,caller_id)
+def reviews(course_id:int,caller_id:int|None=Depends(optional_user_id),page:int=Query(1,ge=1),page_size:int=Query(20,ge=1,le=100),sort:Literal['newest','likes','comments']='newest'):
+    return invoke(service.reviews,course_id,caller_id,page,page_size,sort)
 @router.get('/courses/{course_id}/contribution-status')
 def contribution_status(course_id:int,user:dict=Depends(require_user)):
     conn=get_connection()

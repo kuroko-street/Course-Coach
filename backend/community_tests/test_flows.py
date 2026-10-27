@@ -265,6 +265,62 @@ class CommunityFlows(unittest.TestCase):
         self.assertEqual(self.sql('SELECT status,report_count FROM summary_files WHERE file_id=%s',(fid,))[0],('HIDDEN',5))
         self.assertEqual(self.call('get',f'/summary-files/{fid}/download',2).status_code,404)
 
+    def seed_paged_content(self):
+        self.sql("INSERT INTO users(username,email,display_name,is_mock) SELECT 'page-'||i,'page-'||i||'@example.invalid','Page '||i,TRUE FROM generate_series(9,30) i",fetch=False)
+        self.sql("""INSERT INTO reviews(course_id,reviewer_id,content,rating_satisfaction,rating_recommendation,rating_workload,rating_content,rating_teaching,rating_exam,created_at)
+            SELECT %s,i,'review '||i,4,4,4,4,4,4,TIMESTAMP '2026-01-01'+i*INTERVAL '1 minute' FROM generate_series(2,27) i""",(self.course,),False)
+        self.sql("UPDATE reviews SET status='HIDDEN' WHERE reviewer_id=27",fetch=False)
+        self.sql("INSERT INTO summary_file_upload_batches(course_id,uploader_id) SELECT %s,i FROM generate_series(2,27) i",(self.course,),False)
+        self.sql("""INSERT INTO summary_files(upload_batch_id,filename,stored_path,mime_type,size_bytes,uploaded_at)
+            SELECT upload_batch_id,'file-'||uploader_id||'.pdf','test-only.pdf','application/pdf',100,TIMESTAMP '2026-01-01'+uploader_id*INTERVAL '1 minute'
+            FROM summary_file_upload_batches WHERE course_id=%s""",(self.course,),False)
+        self.sql("UPDATE summary_files SET status='HIDDEN' WHERE filename='file-27.pdf'",fetch=False)
+
+    def test_review_pagination_and_own_review_outside_summary(self):
+        self.seed_paged_content()
+        path=f'/courses/{self.course}/reviews'
+        summary=self.call('get',path,2,params={'page_size':3}).json()
+        self.assertEqual(summary['total'],25)
+        self.assertEqual(len(summary['reviews']),3)
+        self.assertEqual(summary['own_review']['reviewer_id'],2)
+        self.assertNotIn(summary['own_review']['review_id'],[r['review_id'] for r in summary['reviews']])
+        first=self.call('get',path).json();second=self.call('get',path,params={'page':2}).json()
+        self.assertEqual((len(first['reviews']),len(second['reviews'])),(20,5))
+        self.assertEqual(len({r['review_id'] for r in first['reviews']+second['reviews']}),25)
+        self.assertIsNone(first['own_review'])
+        self.assertIsNone(self.call('get',path,27).json()['own_review'])
+        empty=self.call('get',path,params={'page':99}).json()
+        self.assertEqual((empty['total'],empty['reviews']),(25,[]))
+
+    def test_review_sorting_happens_before_pagination(self):
+        self.seed_paged_content()
+        rid=self.sql('SELECT review_id FROM reviews WHERE reviewer_id=2')[0][0]
+        self.sql('INSERT INTO review_likes(review_id,user_id) VALUES(%s,3),(%s,4)',(rid,rid),False)
+        self.sql("INSERT INTO review_comments(review_id,user_id,content) VALUES(%s,3,'first'),(%s,4,'second')",(rid,rid),False)
+        for sort in ('likes','comments'):
+            result=self.call('get',f'/courses/{self.course}/reviews',3,params={'page_size':3,'sort':sort}).json()
+            self.assertEqual(result['reviews'][0]['review_id'],rid)
+            self.assertTrue(result['reviews'][0]['liked_by_me'])
+            self.assertEqual(result['reviews'][0]['comment_count'],2)
+
+    def test_file_pagination_and_count_exclude_hidden_files(self):
+        self.seed_paged_content()
+        path=f'/courses/{self.course}/summary-files'
+        summary=self.call('get',path,params={'page_size':3}).json()
+        self.assertEqual((summary['total'],len(summary['files'])),(25,3))
+        first=self.call('get',path).json();second=self.call('get',path,params={'page':2}).json()
+        self.assertEqual((len(first['files']),len(second['files'])),(20,5))
+        self.assertEqual(len({f['file_id'] for f in first['files']+second['files']}),25)
+        self.assertTrue(all(f['status']=='ACTIVE' and 'stored_path' not in f for f in first['files']))
+        self.assertEqual(self.detail()['file_count'],25)
+        self.assertEqual(self.call('get',path,params={'page':99}).json()['files'],[])
+
+    def test_content_pagination_rejects_invalid_parameters(self):
+        for kind in ('reviews','summary-files'):
+            for params in ({'page':0},{'page_size':0},{'page_size':101}):
+                self.assertEqual(self.call('get',f'/courses/{self.course}/{kind}',params=params).status_code,422)
+        self.assertEqual(self.call('get',f'/courses/{self.course}/reviews',params={'sort':'invalid'}).status_code,422)
+
     def test_concurrent_upload_request_is_one_file(self):
         key=uuid.uuid4()
         with ThreadPoolExecutor(max_workers=2) as pool:

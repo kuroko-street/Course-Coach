@@ -26,8 +26,8 @@ class CourseService:
         result=self._read(self.courses.get_instructor_profile,instructor_id)
         if not result: raise ServiceError(404,'ไม่พบผู้สอน')
         return dict(instructor=result[0],courses=result[1])
-    def reviews(self,course_id,caller_id=None):
-        return {'reviews':self._read(self.courses.list_reviews,course_id,caller_id)}
+    def reviews(self,course_id,caller_id=None,page=1,page_size=20,sort='newest'):
+        return self._read(self.courses.list_reviews,course_id,caller_id,page,page_size,sort)
     def rankings(self,metric='reviews',department=None,min_reviews=0,filters=None):
         if metric not in self.DASHBOARD_METRICS: raise ServiceError(400,'Unsupported metric')
         return dict(metric=metric,rankings=self._read(self.courses.rankings,metric,department,min_reviews,filters))

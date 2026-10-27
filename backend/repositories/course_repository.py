@@ -100,25 +100,44 @@ class CourseRepository:
         canonical_id=self.resolve_active_course_id(conn,course_id)
         if canonical_id is None: return None
         with dict_cursor(conn) as cur:
-            cur.execute(COURSE_ROWS+' WHERE c.course_id=%s AND c.is_active AND c.merged_into_course_id IS NULL',(canonical_id,))
+            cur.execute('SELECT detail.*, (SELECT COUNT(*) FROM summary_files sf JOIN summary_file_upload_batches b USING(upload_batch_id) WHERE b.course_id=detail.course_id AND sf.status=\'ACTIVE\') AS file_count FROM ('+COURSE_ROWS+' WHERE c.course_id=%s AND c.is_active AND c.merged_into_course_id IS NULL) detail',(canonical_id,))
             row=cur.fetchone()
         if row:
             row['averages']={key:row[key] for key in ['review_count',*(f'avg_{a}' for a in ASPECTS)]}
             row['redirected_from']=course_id if course_id!=row['course_id'] else None
         return row
 
-    def list_reviews(self,conn,course_id,caller_id=None):
+    def list_reviews(self,conn,course_id,caller_id=None,page=1,page_size=20,sort='newest'):
         canonical_id=self.resolve_active_course_id(conn,course_id)
         if canonical_id is None: raise ServiceError(404,'Course not found')
+        orders={
+            'newest': ('r.created_at DESC,r.review_id DESC','d.created_at DESC,d.review_id DESC'),
+            'likes': ('(SELECT COUNT(*) FROM review_likes l WHERE l.review_id=r.review_id) DESC,r.review_id DESC','d.like_count DESC,d.review_id DESC'),
+            'comments': ("(SELECT COUNT(*) FROM review_comments rc WHERE rc.review_id=r.review_id AND rc.status='ACTIVE') DESC,r.review_id DESC",'d.comment_count DESC,d.review_id DESC'),
+        }
+        page_order,result_order=orders.get(sort,orders['newest'])
         with dict_cursor(conn) as cur:
-            cur.execute(f"""SELECT {REVIEW_FIELDS},COALESCE(NULLIF(u.display_name,''),u.username) AS reviewer_name,u.avatar_url AS reviewer_avatar,
-            (SELECT COUNT(*) FROM review_likes l WHERE l.review_id=r.review_id) AS like_count,
-            (SELECT COUNT(*) FROM review_comments rc WHERE rc.review_id=r.review_id AND rc.status='ACTIVE') AS comment_count,
-            EXISTS(SELECT 1 FROM review_likes l WHERE l.review_id=r.review_id AND l.user_id=%s) AS liked_by_me,
-            EXISTS(SELECT 1 FROM review_reports rp WHERE rp.review_id=r.review_id AND rp.reporter_id=%s) AS reported_by_me,
-            COALESCE((SELECT json_agg(t ORDER BY t.tag_id) FROM review_tags rt JOIN tags t USING(tag_id) WHERE rt.review_id=r.review_id),'[]'::json) AS tags
-            FROM reviews r JOIN users u ON u.user_id=r.reviewer_id WHERE r.course_id=%s AND r.status='ACTIVE' ORDER BY r.created_at DESC,r.review_id DESC""",(caller_id,caller_id,canonical_id))
-            return cur.fetchall()
+            # Select IDs first: names, content, tags and per-user flags are loaded
+            # only for this page plus the caller's own active review.
+            cur.execute(f"""WITH eligible AS (
+                SELECT review_id,reviewer_id,created_at FROM reviews WHERE course_id=%s AND status='ACTIVE'
+            ), page_ids AS (
+                SELECT r.review_id FROM eligible r ORDER BY {page_order} LIMIT %s OFFSET %s
+            ), selected AS (
+                SELECT review_id FROM page_ids UNION SELECT review_id FROM eligible WHERE reviewer_id=%s
+            ), details AS (
+                SELECT {REVIEW_FIELDS},COALESCE(NULLIF(u.display_name,''),u.username) AS reviewer_name,u.avatar_url AS reviewer_avatar,
+                (SELECT COUNT(*) FROM review_likes l WHERE l.review_id=r.review_id) AS like_count,
+                (SELECT COUNT(*) FROM review_comments rc WHERE rc.review_id=r.review_id AND rc.status='ACTIVE') AS comment_count,
+                EXISTS(SELECT 1 FROM review_likes l WHERE l.review_id=r.review_id AND l.user_id=%s) AS liked_by_me,
+                EXISTS(SELECT 1 FROM review_reports rp WHERE rp.review_id=r.review_id AND rp.reporter_id=%s) AS reported_by_me,
+                COALESCE((SELECT json_agg(t ORDER BY t.tag_id) FROM review_tags rt JOIN tags t USING(tag_id) WHERE rt.review_id=r.review_id),'[]'::json) AS tags
+                FROM selected JOIN reviews r USING(review_id) JOIN users u ON u.user_id=r.reviewer_id
+            ) SELECT (SELECT COUNT(*) FROM eligible) AS total,
+                COALESCE((SELECT json_agg(d ORDER BY {result_order}) FROM details d WHERE d.review_id IN(SELECT review_id FROM page_ids)),'[]'::json) AS reviews,
+                (SELECT row_to_json(d) FROM details d WHERE d.reviewer_id=%s LIMIT 1) AS own_review
+            """,(canonical_id,page_size,(page-1)*page_size,caller_id,caller_id,caller_id,caller_id))
+            return dict(cur.fetchone(),page=page,page_size=page_size)
 
     def get_instructor_profile(self,conn,instructor_id):
         with dict_cursor(conn) as cur:
