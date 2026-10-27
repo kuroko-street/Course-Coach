@@ -18,13 +18,21 @@ def _session_user_id(request: Request, x_user_id: int | None):
     user_id = request.session.get("user_id")
     # Turning mock authentication off also revokes existing mock sessions.
     if user_id is not None and not mock_auth_enabled():
-        conn = get_connection()
-        try:
-            if user_repository.find_mock_by_id(conn, user_id):
-                request.session.clear()
-                return None
-        finally:
-            conn.close()
+        session_is_mock = request.session.get("is_mock")
+        if session_is_mock is True:
+            request.session.clear()
+            return None
+        if session_is_mock is not False:
+            # Older signed cookies lack the flag. Check them once, then mark
+            # real accounts so optional reads avoid a remote DB lookup.
+            conn = get_connection()
+            try:
+                if user_repository.find_mock_by_id(conn, user_id):
+                    request.session.clear()
+                    return None
+            finally:
+                conn.close()
+            request.session["is_mock"] = False
     if user_id is None and x_user_id is not None and mock_auth_enabled():
         conn = get_connection()
         try:
@@ -58,6 +66,8 @@ def require_user(
     if (user["is_mock"] and not mock_enabled) or (header_login and not user["is_mock"]):
         request.session.clear()
         raise HTTPException(status_code=401, detail="Authentication required.")
+    if session_user_id is not None:
+        request.session["is_mock"] = user["is_mock"]
     result = dict(user)
     result.pop("is_mock")
     return result

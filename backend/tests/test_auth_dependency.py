@@ -40,10 +40,78 @@ def set_user_lookup(monkeypatch, is_mock):
 def test_real_session_uses_one_lookup_and_does_not_expose_mock_flag(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     connections = set_user_lookup(monkeypatch, is_mock=False)
+    request = request_with_session(2)
 
-    user = dependencies.require_user(request_with_session(2), x_user_id=None)
+    user = dependencies.require_user(request, x_user_id=None)
 
     assert user == {"user_id": 2, "role": "ADMIN"}
+    assert request.session == {"user_id": 2, "is_mock": False}
+    assert len(connections) == 1 and connections[0].closed
+
+
+def test_optional_real_session_avoids_repeat_lookup(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    request = request_with_session(2)
+    request.session["is_mock"] = False
+    monkeypatch.setattr(dependencies, "get_connection", lambda: pytest.fail("unexpected DB lookup"))
+
+    assert dependencies.optional_user_id(request, x_user_id=None) == 2
+
+
+def test_optional_legacy_session_is_checked_once(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    connections = []
+
+    def connect():
+        conn = FakeConnection()
+        connections.append(conn)
+        return conn
+
+    monkeypatch.setattr(dependencies, "get_connection", connect)
+    monkeypatch.setattr(dependencies.user_repository, "find_mock_by_id", lambda _conn, _id: None)
+    request = request_with_session(2)
+
+    assert dependencies.optional_user_id(request, x_user_id=None) == 2
+    assert request.session == {"user_id": 2, "is_mock": False}
+    assert dependencies.optional_user_id(request, x_user_id=None) == 2
+    assert len(connections) == 1 and connections[0].closed
+
+
+def test_optional_mock_session_is_revoked_without_lookup(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    request = request_with_session(2)
+    request.session["is_mock"] = True
+    monkeypatch.setattr(dependencies, "get_connection", lambda: pytest.fail("unexpected DB lookup"))
+
+    assert dependencies.optional_user_id(request, x_user_id=None) is None
+    assert request.session == {}
+
+
+def test_optional_mock_session_still_works_in_development(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("ALLOW_MOCK_AUTH", "true")
+    request = request_with_session(2)
+    request.session["is_mock"] = True
+    monkeypatch.setattr(dependencies, "get_connection", lambda: pytest.fail("unexpected DB lookup"))
+
+    assert dependencies.optional_user_id(request, x_user_id=None) == 2
+
+
+def test_optional_legacy_mock_session_is_revoked(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    connections = []
+
+    def connect():
+        conn = FakeConnection()
+        connections.append(conn)
+        return conn
+
+    monkeypatch.setattr(dependencies, "get_connection", connect)
+    monkeypatch.setattr(dependencies.user_repository, "find_mock_by_id", lambda _conn, user_id: {"user_id": user_id})
+    request = request_with_session(2)
+
+    assert dependencies.optional_user_id(request, x_user_id=None) is None
+    assert request.session == {}
     assert len(connections) == 1 and connections[0].closed
 
 
