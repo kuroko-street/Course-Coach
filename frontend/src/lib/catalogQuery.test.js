@@ -39,6 +39,7 @@ test('course back links preserve catalog URLs but reject external or unrelated l
 test('dashboard uses safe defaults and clamps invalid numeric input',()=>{
   assert.deepEqual(dashboardState(new URLSearchParams()),{tab:'reviews',aspect:'satisfaction',min:0});
   assert.deepEqual(dashboardState(new URLSearchParams('tab=aspects&aspect=exam&min_reviews=3.9')),{tab:'aspects',aspect:'exam',min:3});
+  assert.deepEqual(dashboardState(new URLSearchParams('tab=likes')),{tab:'reviews',aspect:'satisfaction',min:0});
   for(const [raw,expected] of [['-2',0],['NaN',0],['Infinity',0],['9999999',1000000]])assert.equal(dashboardState(new URLSearchParams({min_reviews:raw})).min,expected);
   assert.deepEqual(dashboardState(new URLSearchParams('tab=bad&aspect=bad')),{tab:'reviews',aspect:'satisfaction',min:0});
 });
