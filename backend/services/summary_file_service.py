@@ -122,9 +122,8 @@ class SummaryFileService:
         try:
             if course_id is not None:
                 from repositories.course_repository import CourseRepository
-                course=CourseRepository().get_detail(conn,course_id)
-                if not course: raise ServiceError(404,'ไม่พบรายวิชา')
-                course_id=course['course_id']
+                course_id=CourseRepository().resolve_active_course_id(conn,course_id)
+                if course_id is None: raise ServiceError(404,'ไม่พบรายวิชา')
             return {'files':self.files.list(conn,course_id,caller_id)}
         finally: conn.close()
     def get_download(self,file_id):
