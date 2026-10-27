@@ -21,7 +21,9 @@ export default function ReviewEditor({courseId,course,review,onClose,onSaved,onC
     try{
       const body={content:content.trim(),tag_ids:tags,...Object.fromEntries(RATING_FIELDS.map(k=>[`rating_${k}`,ratings[k]]))};if(!original)body.course_id=Number(courseId);
       await api(original?`/reviews/${original.review_id}`:'/reviews',{method:original?'PUT':'POST',body});setSaved(true);
-      try{const refreshed=await onSaved?.();if(refreshed===false)return;if(refreshed===null)throw new Error('โหลดข้อมูลล่าสุดไม่สำเร็จ');toast.success(review?'แก้ไขรีวิวแล้ว':'บันทึกรีวิวแล้ว','คะแนนและแท็กอัปเดตตามรีวิวล่าสุด');onClose();}catch(e){setError('บันทึกรีวิวแล้ว แต่โหลดหน้าจอล่าสุดไม่สำเร็จ กรุณาปิดหน้าต่างแล้วโหลดหน้าใหม่');}
+      toast.success(review?'แก้ไขรีวิวแล้ว':'บันทึกรีวิวแล้ว','คะแนนและแท็กอัปเดตตามรีวิวล่าสุด');
+      onClose();
+      void Promise.resolve().then(()=>onSaved?.()).then(refreshed=>{if(refreshed===null)toast.error('โหลดข้อมูลล่าสุดไม่สำเร็จ','ลองโหลดหน้าวิชาใหม่');}).catch(()=>toast.error('โหลดข้อมูลล่าสุดไม่สำเร็จ','ลองโหลดหน้าวิชาใหม่'));
     }catch(e){if(!(await onCourseError?.(e)))setError(e.message);}finally{setBusy(false);}
   }
   return <Modal className="ux-review-modal" title={original?'แก้ไขรีวิว':'เขียนรีวิว'} subtitle={courseSubtitle(course)||`รายการวิชา #${courseId}`} onClose={onClose} busy={busy} dirty={dirty} footer={<><span className="ux-footer-hint">เลือกคะแนนแล้ว {answered} / 6 ด้าน</span><button type="button" className="btn-ghost" disabled={busy} onClick={()=>formRef.current?.closest('[role="dialog"]')?.querySelector('.modal-close')?.click()}>ยกเลิก</button>{saved?<button type="button" onClick={onClose}>ปิดหน้าต่าง</button>:<button type="submit" form={formId} disabled={busy||!content.trim()}>{busy?'กำลังบันทึก…':original?'บันทึกการแก้ไข':'ส่งรีวิว'}</button>}</>}>
