@@ -60,9 +60,28 @@ class CloudStorageTests(unittest.TestCase):
         sdk.uploader.upload.return_value = {'public_id': 'coursecoach/documents/random.pdf'}
         with patch.object(cloud_storage, 'client', return_value=sdk):
             result = cloud_storage.save(Path(self.temp.name) / 'random.pdf')
-        self.assertTrue(result.startswith(cloud_storage.PREFIX))
-        self.assertEqual(sdk.uploader.upload.call_args.kwargs['type'], 'private')
-        self.assertEqual(sdk.uploader.upload.call_args.kwargs['resource_type'], 'raw')
+        self.assertEqual(result, 'cloudinary://coursecoach/documents/random.pdf')
+        upload = sdk.uploader.upload.call_args.kwargs
+        self.assertEqual(upload['folder'], 'coursecoach/documents')
+        self.assertEqual(upload['public_id'], 'random.pdf')
+        self.assertEqual(upload['type'], 'private')
+        self.assertEqual(upload['resource_type'], 'raw')
+
+    def test_avatar_upload_uses_separate_folder_and_preserves_returned_url(self):
+        sdk = Mock()
+        sdk.uploader.upload.return_value = {
+            'secure_url': 'https://res.cloudinary.com/test/image/upload/coursecoach/avatars/random.png',
+            'public_id': 'coursecoach/avatars/random.png',
+        }
+        with patch.object(cloud_storage, 'client', return_value=sdk):
+            url, public_id = cloud_storage.save(Path(self.temp.name) / 'random.png', avatar=True)
+        self.assertEqual(url, sdk.uploader.upload.return_value['secure_url'])
+        self.assertEqual(public_id, 'coursecoach/avatars/random.png')
+        upload = sdk.uploader.upload.call_args.kwargs
+        self.assertEqual(upload['folder'], 'coursecoach/avatars')
+        self.assertEqual(upload['public_id'], 'random.png')
+        self.assertEqual(upload['type'], 'upload')
+        self.assertEqual(upload['resource_type'], 'image')
 
     def run_upload(self, *, commit_error=False, oversized=False):
         pdf = PdfWriter(); pdf.add_blank_page(width=72, height=72)
