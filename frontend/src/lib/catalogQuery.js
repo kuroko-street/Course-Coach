@@ -21,7 +21,7 @@ export function catalogReturnPath(value) {
   return typeof value === 'string' && /^(\/|\/dashboard)(\?[^#]*)?$/.test(value) ? value : '/';
 }
 export function dashboardState(params) {
-  const tab = ['reviews','likes','aspects'].includes(params.get('tab')) ? params.get('tab') : 'reviews';
+  const tab = ['reviews','aspects'].includes(params.get('tab')) ? params.get('tab') : 'reviews';
   const fields = ['satisfaction','recommendation','workload','content','teaching','exam'];
   const aspect = fields.includes(params.get('aspect')) ? params.get('aspect') : 'satisfaction';
   const raw = Number(params.get('min_reviews'));
