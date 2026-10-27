@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {api} from './api.js';
+import {formatThaiDateTime} from './lib/dateTime.js';
 import './admin-dashboard.css';
 const actions={EDIT_COURSE:'แก้ไขข้อมูลรายวิชา',COURSE_STATUS:'เปลี่ยนการแสดงรายวิชา',MERGE_COURSES:'รวมรายวิชา'};
 const number=n=>Number(n).toLocaleString('th-TH');
@@ -18,6 +19,6 @@ export default function AdminDashboard(){
     <div className="ad-columns"><article className="card ad-duplicates-panel"><div className="ad-section-title"><h2>รายวิชาที่อาจซ้ำ</h2><span className="ad-badge">{number(data.duplicate_groups)} กลุ่ม</span></div><p className="muted">รหัสเดียวกันในมหาวิทยาลัยเดียวกัน อาจเป็นคนละเทอมหรือผู้สอน ควรตรวจสอบก่อนรวม</p>
       {data.duplicates.length?<ul className="ad-list">{data.duplicates.map(g=><li key={`${g.university_id}-${g.code_normalized}`}><div><strong>{g.course_code}</strong><p className="muted">{number(g.course_count)} รายวิชา</p></div><Link to={`/admin?code=${encodeURIComponent(g.course_code)}`}>ตรวจสอบ →</Link></li>)}</ul>:<div className="ad-empty">ยังไม่พบกลุ่มรายวิชารหัสซ้ำ</div>}
       {data.duplicate_groups>10&&<p className="muted">แสดง 10 กลุ่มที่มีรายการมากที่สุด</p>}</article>
-      <article className="card ad-activity-panel"><h2>การจัดการล่าสุด</h2><p className="muted">การแก้ไข เปิด/ปิด และรวมรายวิชา 15 รายการล่าสุด</p>{data.activity.length?<ul className="ad-list">{data.activity.map(a=><li key={a.log_id}><div><strong>{actions[a.action]}</strong><p className="muted">{a.actor} · {new Date(a.timestamp).toLocaleString('th-TH')}</p></div>{a.target_id&&<Link to={`/course/${a.target_id}`}>วิชา #{a.target_id}</Link>}</li>)}</ul>:<div className="ad-empty">ยังไม่มีประวัติการจัดการรายวิชา</div>}</article></div></>}
+      <article className="card ad-activity-panel"><h2>การจัดการล่าสุด</h2><p className="muted">การแก้ไข เปิด/ปิด และรวมรายวิชา 15 รายการล่าสุด</p>{data.activity.length?<ul className="ad-list">{data.activity.map(a=><li key={a.log_id}><div><strong>{actions[a.action]}</strong><p className="muted">{a.actor} · {formatThaiDateTime(a.timestamp)}</p></div>{a.target_id&&<Link to={`/course/${a.target_id}`}>วิชา #{a.target_id}</Link>}</li>)}</ul>:<div className="ad-empty">ยังไม่มีประวัติการจัดการรายวิชา</div>}</article></div></>}
   </section>;
 }

@@ -1,7 +1,8 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from '../api.js';
+import {formatThaiDateTime} from '../lib/dateTime.js';
 
-export const permissionDate = value => new Date(value).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'});
+export const permissionDate = value => formatThaiDateTime(value,{dateStyle:'medium',timeStyle:'short'});
 export function useContributionStatus(courseId,userId){
   const [state,setState]=useState(null),[error,setError]=useState('');
   const key=`${courseId}:${userId||''}`,scope=useRef(key),mounted=useRef(true);scope.current=key;
