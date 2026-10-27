@@ -479,14 +479,16 @@ class CommunityFlows(unittest.TestCase):
         self.assertEqual(self.call('get',f'/reviews/{second}/comments').status_code,404)
         self.assertEqual(self.call('put',f'/reviews/{second}',2,{k:v for k,v in self.review_body().items() if k!='course_id'}).status_code,409)
 
-    def test_merge_file_overage_kept_only_after_acknowledgment(self):
+    def test_merge_file_overage_requires_strategy_and_archives_excess(self):
         source=self.create_course(course_name='Other name')
         for c in [self.course,source]:
             for _ in range(2): self.upload(course=c)
         body=self.merge_body(source);p=self.preview(body)
         self.assertEqual(p['file_overages'][0]['used'],4);self.assertEqual(self.merge(body,p).status_code,400)
-        body['accept_file_overage']=True;self.assertEqual(self.merge(body).status_code,200)
-        self.assertEqual(self.permissions()['files']['used'],4);self.assertEqual(self.upload().status_code,409)
+        body['accept_file_overage']=True;self.assertEqual(self.merge(body).status_code,400)
+        body['file_selection_mode']='latest';self.assertEqual(self.merge(body).status_code,200)
+        self.assertEqual(self.permissions()['files']['used'],3);self.assertEqual(self.upload().status_code,409)
+        self.assertEqual(self.sql("SELECT COUNT(*) FROM summary_files WHERE status='ARCHIVED'")[0][0],1)
         self.assertEqual(self.sql('SELECT COUNT(*) FROM summary_files')[0][0],4)
 
     def test_merge_preserves_cooldowns_on_canonical_course(self):

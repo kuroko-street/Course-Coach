@@ -173,6 +173,22 @@ class CatalogRepository:
             if hold['file_id'] and hold['expires_at']>now: counts[hold['user_id']]['held']+=1
         return [{'user_id':uid,**value} for uid,value in counts.items() if value['used']+value['held']>3]
 
+    @staticmethod
+    def file_resolution(snapshot, primary, mode):
+        from datetime import datetime, timezone
+        affected = {r['user_id'] for r in CatalogRepository.file_overages(snapshot)}
+        batches = {b['upload_batch_id']: b for b in snapshot['batches']}
+        result = []
+        for uid in sorted(affected):
+            files = [f for f in snapshot['files'] if f['status']=='ACTIVE' and batches[f['upload_batch_id']]['uploader_id']==uid]
+            holds = [h for h in snapshot['cooldowns'] if h['user_id']==uid and h['file_id'] and h['expires_at']>datetime.now(timezone.utc)]
+            files.sort(key=lambda f: (f['uploaded_at'], f['file_id']), reverse=True)
+            if mode=='primary': files.sort(key=lambda f: batches[f['upload_batch_id']]['course_id']!=primary)
+            kept = files[:max(0,3-len(holds))] if mode in ('latest','primary') else []
+            ids = {f['file_id'] for f in kept}
+            result.append({'user_id':uid,'keep_file_ids':sorted(ids),'archive_file_ids':[f['file_id'] for f in files if f['file_id'] not in ids], 'release_cooldown_ids':[h['cooldown_id'] for h in holds] if mode=='reset' else [], 'held':0 if mode=='reset' else len(holds)})
+        return result
+
     def lock_merge_tables(self, conn):
         # Rare admin operation: block content/plan changes briefly while moving pointers.
         # Taking table locks before course locks gives every merge the same lock order.
@@ -188,8 +204,9 @@ class CatalogRepository:
             if len(chosen & ids)!=1: raise ServiceError(400,'เลือกหนึ่งรีวิวที่จะคงแสดงต่อบัญชี ส่วนที่เหลือจะเก็บเป็นประวัติ')
             archive.extend(ids-chosen)
         if not chosen.issubset(allowed_reviews): raise ServiceError(400,'ตัวเลือกรีวิวไม่ตรงกับ preview')
-        if self.file_overages(snapshot) and not payload.accept_file_overage:
-            raise ServiceError(400,'ต้องยืนยันเก็บไฟล์เดิมแม้เกินโควต้า และงดอัปเพิ่มจนมีช่องว่าง')
+        if self.file_overages(snapshot) and payload.file_selection_mode is None:
+            raise ServiceError(400,'Select a file resolution strategy before merging.')
+        file_resolution = self.file_resolution(snapshot, primary, payload.file_selection_mode)
         conflicts = self.plan_conflicts(snapshot)
         keep = set(payload.keep_plan_item_ids)
         remove = []
@@ -202,6 +219,12 @@ class CatalogRepository:
         if not keep.issubset(allowed):
             raise ServiceError(400, "ตัวเลือกแผนเรียนไม่ตรงกับ preview")
         with dict_cursor(conn) as cur:
+            archived_files = [fid for r in file_resolution for fid in r['archive_file_ids']]
+            released_holds = [hid for r in file_resolution for hid in r['release_cooldown_ids']]
+            if archived_files:
+                cur.execute("UPDATE summary_files SET status='ARCHIVED' WHERE file_id=ANY(%s)", (archived_files,))
+            if released_holds:
+                cur.execute('DELETE FROM contribution_cooldowns WHERE cooldown_id=ANY(%s)', (released_holds,))
             # Release source uniqueness before changing the primary to a selected source's identity.
             cur.execute("UPDATE courses SET merged_into_course_id=%s,is_active=FALSE,updated_at=clock_timestamp() WHERE course_id=ANY(%s)", (primary, sources))
             self.update_course(conn, primary, data)
@@ -223,7 +246,7 @@ class CatalogRepository:
             moved = {"review_ids": [r["review_id"] for r in snapshot["reviews"] if r["course_id"] in sources],
                      "batch_ids": [r["upload_batch_id"] for r in snapshot["batches"] if r["course_id"] in sources],
                      "plan_items_before": snapshot["plan_items"], "explicitly_consolidated_plan_item_ids": remove,
-                     "explicitly_archived_review_ids": archive, "file_overage_accepted": payload.accept_file_overage}
+                     "explicitly_archived_review_ids": archive, "file_selection_mode": payload.file_selection_mode, "file_resolution": file_resolution}
             encode = lambda x: json.dumps(x, default=str, ensure_ascii=False)
             cur.execute("""INSERT INTO course_merge_history(request_id,admin_id,primary_course_id,source_course_ids,reason,before_snapshot,after_snapshot,moved_records)
                            VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING merge_id""",

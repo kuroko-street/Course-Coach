@@ -57,7 +57,8 @@ class MergePreviewPayload(BaseModel):
     reason: str = Field(min_length=5, max_length=2000)
     keep_plan_item_ids: list[int] = Field(default_factory=list, max_length=10000)
     keep_review_ids: list[int] = Field(default_factory=list, max_length=10000)
-    accept_file_overage: bool = False
+    accept_file_overage: bool = False  # Legacy clients cannot bypass file resolution.
+    file_selection_mode: Literal["latest", "primary", "reset"] | None = None
 
     @model_validator(mode="after")
     def different_sources(self):

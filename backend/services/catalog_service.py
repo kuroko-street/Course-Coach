@@ -119,6 +119,7 @@ class CatalogService:
                     'plan_conflicts':self.repo.plan_conflicts(snapshot),
                     'review_conflicts':self.repo.review_conflicts(snapshot),
                     'file_overages':self.repo.file_overages(snapshot),
+                    'file_resolution':self.repo.file_resolution(snapshot,payload.primary_course_id,payload.file_selection_mode),
                     'warnings':['ปี เทอม หรือผู้สอนต่างกัน ปกติควรแยกกัน รวมเฉพาะเมื่อยืนยันว่าข้อมูลเดิมผิดจริง'] if len(contexts)>1 else []}
         finally: conn.close()
 
