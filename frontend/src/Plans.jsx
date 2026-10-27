@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
 import { useToast } from "./components/ToastProvider.jsx";
+import { ConfirmDialog } from "./components/Modal.jsx";
 
 /** Smallest positive N such that "แผนN" isn't already taken (reuses gaps left by deleted plans). */
 function nextPlanName(existingPlans) {
@@ -30,6 +31,9 @@ export default function Plans() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -69,15 +73,19 @@ export default function Plans() {
     }
   }
 
-  async function handleDelete(planId) {
-    if (!window.confirm("ลบแผนการเรียนนี้? การลบไม่สามารถย้อนกลับได้")) return;
-    setError("");
+  async function handleDelete() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
     try {
-      await api(`/plans/${planId}`, { method: "DELETE", userId: user.user_id });
-      setPlans((prev) => prev.filter((p) => p.plan_id !== planId));
+      await api(`/plans/${deleteTarget.plan_id}`, { method: "DELETE", userId: user.user_id });
+      setPlans((prev) => prev.filter((p) => p.plan_id !== deleteTarget.plan_id));
+      setDeleteTarget(null);
       toast.success("ลบแผนการเรียนแล้ว");
     } catch (err) {
-      toast.error("ลบแผนไม่สำเร็จ", err.message);
+      setDeleteError(err.message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -115,7 +123,7 @@ export default function Plans() {
               <button
                 type="button"
                 className="btn-danger-outline"
-                onClick={() => handleDelete(p.plan_id)}
+                onClick={() => { setDeleteError(""); setDeleteTarget(p); }}
               >
                 ลบแผน
               </button>
@@ -123,6 +131,14 @@ export default function Plans() {
           ))}
         </div>
       )}
+      {deleteTarget && <ConfirmDialog
+        title={`ลบแผน “${deleteTarget.plan_name}”?`}
+        confirmLabel="ยืนยันลบแผน"
+        busy={deleting}
+        error={deleteError}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      >การลบแผนการเรียนนี้ไม่สามารถย้อนกลับได้</ConfirmDialog>}
     </section>
   );
 }
