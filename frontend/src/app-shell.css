@@ -617,8 +617,16 @@ input[type="checkbox"]:checked::before { content: none; }
 .ux-dashboard .ux-rank-controls input,
 .ux-dashboard .ux-rank-controls select { border-radius: 10px; }
 .ux-dashboard .ux-ranking-card:first-child .ux-rank-number {
-  background: #fff3d9;
-  color: #8b5d0b;
+  background: #fff0c2;
+  color: #7b5200;
+}
+.ux-dashboard .ux-ranking-card:nth-child(2) .ux-rank-number {
+  background: #e7edf3;
+  color: #3e5268;
+}
+.ux-dashboard .ux-ranking-card:nth-child(3) .ux-rank-number {
+  background: #f6ddc7;
+  color: #814219;
 }
 @media (prefers-reduced-motion: reduce) {
   .ux-dashboard .ux-ranking-card { transition: none; }
