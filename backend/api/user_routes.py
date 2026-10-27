@@ -45,6 +45,7 @@ def login_mock(payload: LoginMock, request: Request):
     result = invoke(service.login_mock, payload.user_id, ip)
     request.session.clear()
     request.session["user_id"] = result["user"]["user_id"]
+    request.session["is_mock"] = True
     return result
 
 
