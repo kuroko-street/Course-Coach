@@ -117,14 +117,14 @@ class SummaryFileService:
                 for path in stored: path.unlink(missing_ok=True)
             for upload in uploads: await upload.close()
 
-    def list_files(self,course_id=None,caller_id=None):
+    def list_files(self,course_id=None,caller_id=None,page=1,page_size=20):
         conn=self.connection_factory()
         try:
             if course_id is not None:
                 from repositories.course_repository import CourseRepository
                 course_id=CourseRepository().resolve_active_course_id(conn,course_id)
                 if course_id is None: raise ServiceError(404,'ไม่พบรายวิชา')
-            return {'files':self.files.list(conn,course_id,caller_id)}
+            return self.files.list(conn,course_id,caller_id,page,page_size)
         finally: conn.close()
     def get_download(self,file_id):
         conn=self.connection_factory()

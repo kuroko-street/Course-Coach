@@ -2,7 +2,7 @@ import os
 import asyncio
 from pathlib import Path
 from uuid import UUID
-from fastapi import APIRouter,Depends,File,Form,UploadFile,HTTPException,Request
+from fastapi import APIRouter,Depends,File,Form,UploadFile,HTTPException,Request,Query
 from fastapi.responses import FileResponse,RedirectResponse,Response
 from api.dependencies import require_user,optional_user_id
 from api.course_routes import invoke
@@ -20,9 +20,11 @@ async def upload(course_id:int,files:list[UploadFile]=File(...),upload_request_i
     try: return await asyncio.to_thread(lambda: asyncio.run(service.upload(course_id,user,files,upload_request_id=upload_request_id)))
     except ServiceError as exc: raise HTTPException(exc.status_code,exc.detail) from exc
 @router.get('/courses/{course_id}/summary-files')
-def listing(course_id:int,caller_id:int|None=Depends(optional_user_id)): return invoke(service.list_files,course_id,caller_id)
+def listing(course_id:int,caller_id:int|None=Depends(optional_user_id),page:int=Query(1,ge=1),page_size:int=Query(20,ge=1,le=100)):
+    return invoke(service.list_files,course_id,caller_id,page,page_size)
 @router.get('/summary-files')
-def all_files(caller_id:int|None=Depends(optional_user_id)): return invoke(service.list_files,None,caller_id)
+def all_files(caller_id:int|None=Depends(optional_user_id),page:int=Query(1,ge=1),page_size:int=Query(20,ge=1,le=100)):
+    return invoke(service.list_files,None,caller_id,page,page_size)
 @router.get('/summary-files/{file_id}/download')
 def download(file_id:int,user:dict=Depends(require_user)):
     path,name,mime=invoke(service.get_download,file_id)
