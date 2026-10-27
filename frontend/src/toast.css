@@ -82,3 +82,19 @@
 @media (prefers-reduced-motion: reduce) {
   .app-toast, .app-toast-progress { animation: none; }
 }
+
+/* Shared floating notifications: status color ties icon and timer together. */
+.app-toast { --toast-color: #23804b; --toast-soft: #eaf6ee; grid-template-columns: 32px minmax(0,1fr) 30px; padding: 16px 16px 20px; gap: 12px; border-color: #dfe5ec; border-radius: 14px; box-shadow: 0 8px 24px #15203312, 0 2px 6px #15203306; color: #26364b; }
+.app-toast-error { --toast-color: #b13c49; --toast-soft: #fff0f2; }
+.app-toast-info { --toast-color: #386aa4; --toast-soft: #edf4fc; }
+.app-toast .app-toast-icon { background: var(--toast-soft); color: var(--toast-color); border-radius: 10px; }
+.app-toast .app-toast-icon svg { stroke-width: 2.2; }
+.app-toast .app-toast-copy strong { font-size: 14px; font-weight: 600; line-height: 1.65; }
+.app-toast .app-toast-copy p { color: #647185; font-size: 13px; line-height: 1.75; margin-top: 4px; }
+.app-toast .app-toast-close { width: 30px; height: 30px; border-radius: 8px; color: #788597; }
+.app-toast .app-toast-close:hover { background: #f1f4f8; color: #38475b; filter: none; }
+.app-toast .app-toast-close:focus-visible { outline: 2px solid var(--toast-color); outline-offset: 2px; }
+.app-toast .app-toast-progress { background: var(--toast-color); opacity: .65; height: 3px; }
+@media (max-width: 650px) {
+  .app-toast { padding: 14px 14px 18px; gap: 10px; }
+}

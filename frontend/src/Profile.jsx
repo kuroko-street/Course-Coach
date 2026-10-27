@@ -124,7 +124,7 @@ export default function Profile() {
         </div> : <div className="profile-review-list">
           {data.reviews.map(r => <Link className="profile-review-link" to={`/course/${r.course_id}`} key={r.review_id}>
             <div className="profile-review-top"><strong>{r.course_code} · {r.course_name}</strong><span>♡ {r.like_count}</span></div>
-            <div className="meta">ปี {r.academic_year} · {r.semester === "summer" ? "ภาคฤดูร้อน" : `เทอม ${r.semester}`} · พึงพอใจ {r.rating_satisfaction}/5</div>
+            <div className="meta">ปี {r.academic_year} · {r.semester === "summer" ? "ภาคฤดูร้อน" : `เทอม ${r.semester}`} · พึงพอใจ {r.rating_satisfaction} / 5</div>
             <p className="review-content">{r.content}</p>
           </Link>)}
         </div>}
