@@ -24,9 +24,9 @@ def client():
 
 def save(path, *, avatar=False):
     sdk = client()
-    public_id = 'coursecoach/' + ('avatars/' if avatar else 'documents/') + path.name
+    folder = 'coursecoach/avatars' if avatar else 'coursecoach/documents'
     try:
-        result = sdk.uploader.upload(str(path), public_id=public_id,
+        result = sdk.uploader.upload(str(path), folder=folder, public_id=path.name,
             resource_type='image' if avatar else 'raw',
             type='upload' if avatar else 'private', overwrite=False, timeout=60)
         return (result['secure_url'], result['public_id']) if avatar else PREFIX + result['public_id']
