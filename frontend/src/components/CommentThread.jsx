@@ -7,20 +7,20 @@ import ActionMenu from './ActionMenu.jsx';
 import {ConfirmDialog} from './Modal.jsx';
 import {useToast} from './ToastProvider.jsx';
 
-export default function CommentThread({basePath,onChanged}){
+export default function CommentThread({basePath,onChanged,onCourseError}){
   const toast=useToast();
   const {user}=useAuth(),location=useLocation(),editRef=useRef(null);
   const [items,setItems]=useState([]),[text,setText]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
   const [editing,setEditing]=useState(null),[editText,setEditText]=useState(''),[reported,setReported]=useState([]),[confirm,setConfirm]=useState(null);
   async function load(){const data=await api(`${basePath}/comments`);setItems(data.comments);}
-  useEffect(()=>{const c=new AbortController();setLoading(true);setError('');api(`${basePath}/comments`,{signal:c.signal}).then(data=>setItems(data.comments)).catch(err=>{if(err.name!=='AbortError')setError(err.message);}).finally(()=>{if(!c.signal.aborted)setLoading(false);});return()=>c.abort();},[basePath]);
+  useEffect(()=>{const c=new AbortController();setLoading(true);setError('');api(`${basePath}/comments`,{signal:c.signal}).then(data=>setItems(data.comments)).catch(async err=>{if(!c.signal.aborted&&err.name!=='AbortError'&&!(await onCourseError?.(err))&&!c.signal.aborted)setError(err.message);}).finally(()=>{if(!c.signal.aborted)setLoading(false);});return()=>c.abort();},[basePath,onCourseError]);
   useEffect(()=>{if(editing!=null)editRef.current?.focus();},[editing]);
   async function action(path,method,body,done){
     if(busy)return;setBusy(true);setError('');
     try{
       await api(path,{method,body});done?.();setConfirm(null);
-      try{await load();await onChanged?.();toast.success(path.endsWith('/report')?'ส่งรายงานแล้ว':method==='DELETE'?'ลบความคิดเห็นแล้ว':method==='PUT'?'แก้ไขความคิดเห็นแล้ว':'ส่งความคิดเห็นแล้ว');}catch(err){setError('บันทึกแล้ว แต่โหลดความคิดเห็นล่าสุดไม่สำเร็จ กรุณาปิดและเปิดความคิดเห็นใหม่');}
-    }catch(err){setError(err.message);}finally{setBusy(false);}
+      try{await load();if(await onChanged?.()===false)return;toast.success(path.endsWith('/report')?'ส่งรายงานแล้ว':method==='DELETE'?'ลบความคิดเห็นแล้ว':method==='PUT'?'แก้ไขความคิดเห็นแล้ว':'ส่งความคิดเห็นแล้ว');}catch(err){if(!(await onCourseError?.(err)))setError('บันทึกแล้ว แต่โหลดความคิดเห็นล่าสุดไม่สำเร็จ กรุณาปิดและเปิดความคิดเห็นใหม่');}
+    }catch(err){if(!(await onCourseError?.(err)))setError(err.message);}finally{setBusy(false);}
   }
   return <div className="comments-list ux-comments">
     {loading?<p role="status" className="ux-comments-empty">กำลังโหลดความคิดเห็น…</p>:!items.length&&!error&&<p className="ux-comments-empty">ยังไม่มีความคิดเห็น เริ่มพูดคุยเกี่ยวกับเนื้อหานี้ได้เลย</p>}

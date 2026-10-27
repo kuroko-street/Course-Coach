@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Link,useLocation,useNavigate,useParams,useSearchParams} from 'react-router-dom';
+import {Link,useLocation,useParams,useSearchParams} from 'react-router-dom';
 import {api} from './api.js';
 import {useAuth} from './AuthContext.jsx';
 import {RATING_FIELDS,RATING_LABELS,RATING_SHORT_LABELS} from './RatingStars.jsx';
@@ -10,17 +10,21 @@ import UploadDialog from './components/UploadDialog.jsx';
 import {loginPath,semesterLabel} from './components/CourseUI.jsx';
 import {FileQuota,permissionDate,useContributionStatus} from './components/ContributionStatus.jsx';
 import {catalogReturnPath} from './lib/catalogQuery.js';
+import useCourseUnavailableRedirect from './useCourseUnavailableRedirect.js';
 
 export default function CourseDetail({listMode=null}){
-  const {id}=useParams(),{user,authReady}=useAuth(),[params,setParams]=useSearchParams(),navigate=useNavigate(),location=useLocation();
+  const {id}=useParams(),{user,authReady}=useAuth(),[params,setParams]=useSearchParams(),location=useLocation();
   const [course,setCourse]=useState(null),[reviews,setReviews]=useState([]),[files,setFiles]=useState([]);
   const [error,setError]=useState(''),[loading,setLoading]=useState(true),[dialog,setDialog]=useState(null),[retry,setRetry]=useState(0);
   const [reviewsLoading,setReviewsLoading]=useState(true),[filesLoading,setFilesLoading]=useState(true);
   const [reviewError,setReviewError]=useState(''),[fileError,setFileError]=useState('');
-  const routeKey=`${id}:${user?.user_id||''}:${listMode||''}`,currentRoute=useRef(routeKey);currentRoute.current=routeKey;
+  const routeKey=`${id}:${user?.user_id||''}:${listMode||''}`,currentRoute=useRef(routeKey),active=useRef(true);currentRoute.current=routeKey;
+  const {redirect:redirectUnavailable,check:checkUnavailable}=useCourseUnavailableRedirect();
+  const handleCourseError=useCallback(error=>checkUnavailable(id,error,()=>active.current&&currentRoute.current===routeKey),[id,routeKey,checkUnavailable]);
   const {state:permissions,error:permissionError,refresh:refreshPermissions}=useContributionStatus(id,user?.user_id);
   const ownReview=reviews.find(r=>r.review_id===permissions?.review.active_review_id);
   const from=catalogReturnPath(location.state?.from),path=`/course/${id}`;
+  useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
   const tab=listMode|| (params.get('tab')==='files'?'files':'reviews');
   const sort=['newest','likes','comments'].includes(params.get('sort'))?params.get('sort'):'newest';
   const updateReviewLike=useCallback((reviewId,liked,likeCount)=>{
@@ -37,33 +41,36 @@ export default function CourseDetail({listMode=null}){
         api(`/courses/${id}`),api(`/courses/${id}/reviews`),api(`/courses/${id}/summary-files`),
         refreshPermissions().then(()=>null,e=>e),
       ]);
-      if(currentRoute.current!==routeKey)return;
-      if(c.redirected_from){navigate(`/course/${c.course_id}${listMode==='files'?'/summary-files':listMode==='reviews'?'/reviews':''}`,{replace:true,state:{from}});return;}
+      if(!active.current||currentRoute.current!==routeKey)return false;
+      if(c.redirected_from){redirectUnavailable();return false;}
+      if(permissionIssue&&await handleCourseError(permissionIssue))return false;
       setCourse(c);setReviews(r.reviews);setFiles(f.files);setReviewError('');setFileError('');
       setError(permissionIssue?'โหลดสิทธิ์ล่าสุดไม่สำเร็จ: '+permissionIssue.message:'');
-    }catch(e){if(currentRoute.current===routeKey)setError('รายการอาจบันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ: '+e.message);}
-  },[id,routeKey,listMode,from,navigate,refreshPermissions]);
+      return true;
+    }catch(e){if(await handleCourseError(e))return false;if(active.current&&currentRoute.current===routeKey)setError('รายการอาจบันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ: '+e.message);return null;}
+  },[id,routeKey,refreshPermissions,redirectUnavailable,handleCourseError]);
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);
     setCourse(null);setError('');setDialog(null);
     api(`/courses/${id}`,{signal:controller.signal}).then(c=>{
       if(controller.signal.aborted)return;
-      if(c.redirected_from){navigate(`/course/${c.course_id}${listMode==='files'?'/summary-files':listMode==='reviews'?'/reviews':''}`,{replace:true,state:{from}});return;}
+      if(c.redirected_from){redirectUnavailable();return;}
       setCourse(c);
-    }).catch(e=>{if(e.name!=='AbortError')setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    }).catch(e=>{if(controller.signal.aborted||e.name==='AbortError')return;if(e.status===404)redirectUnavailable();else setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
-  },[id,listMode,retry]);
+  },[id,listMode,retry,redirectUnavailable]);
   useEffect(()=>{
     setReviewsLoading(true);setFilesLoading(true);
     setReviews([]);setFiles([]);setReviewError('');setFileError('');
     if(!authReady)return;
     const controller=new AbortController();
     api(`/courses/${id}/reviews`,{signal:controller.signal}).then(r=>{if(!controller.signal.aborted)setReviews(r.reviews);})
-      .catch(e=>{if(e.name!=='AbortError')setReviewError(e.message);}).finally(()=>{if(!controller.signal.aborted)setReviewsLoading(false);});
+      .catch(async e=>{if(!controller.signal.aborted&&e.name!=='AbortError'&&!(await handleCourseError(e))&&!controller.signal.aborted)setReviewError(e.message);}).finally(()=>{if(!controller.signal.aborted)setReviewsLoading(false);});
     api(`/courses/${id}/summary-files`,{signal:controller.signal}).then(f=>{if(!controller.signal.aborted)setFiles(f.files);})
-      .catch(e=>{if(e.name!=='AbortError')setFileError(e.message);}).finally(()=>{if(!controller.signal.aborted)setFilesLoading(false);});
+      .catch(async e=>{if(!controller.signal.aborted&&e.name!=='AbortError'&&!(await handleCourseError(e))&&!controller.signal.aborted)setFileError(e.message);}).finally(()=>{if(!controller.signal.aborted)setFilesLoading(false);});
     return()=>controller.abort();
-  },[id,user?.user_id,authReady,retry]);
+  },[id,user?.user_id,authReady,retry,handleCourseError]);
+  useEffect(()=>{if(permissionError==='ไม่พบรายวิชา')handleCourseError({status:404,message:permissionError});},[permissionError,handleCourseError]);
   useEffect(()=>{
     if(user&&course&&permissions&&params.get('review')==='1'){
       if(permissions.review.can_create||ownReview)setDialog('review');
@@ -81,11 +88,11 @@ export default function CourseDetail({listMode=null}){
     !authReady?<button disabled>กำลังตรวจบัญชี…</button>:!user?<Link className="btn" to={loginPath(path+'?tab=files')}>เข้าสู่ระบบเพื่ออัปโหลด</Link>:<button type="button" disabled={!canUpload} onClick={()=>setDialog('upload')}>{!permissions?'กำลังตรวจสิทธิ์…':canUpload?'+ อัปโหลดไฟล์':'ยังไม่มีช่องอัปโหลดว่าง'}</button>;
   const reviewContent=reviewsLoading?<p className="ux-loading" role="status">กำลังโหลดรีวิว…</p>:
     reviewError?<div className="alert alert-error ux-inline-error" role="alert"><span>โหลดรีวิวไม่สำเร็จ: {reviewError}</span><button type="button" className="btn-ghost" onClick={()=>setRetry(x=>x+1)}>ลองใหม่</button></div>:
-    shownReviews.length?shownReviews.map(r=><ReviewCard key={r.review_id} review={r} course={course} onChanged={load} onLikeChanged={updateReviewLike}/>):
+    shownReviews.length?shownReviews.map(r=><ReviewCard key={r.review_id} review={r} course={course} onChanged={load} onLikeChanged={updateReviewLike} onCourseError={handleCourseError}/>):
     <div className="card ux-empty"><h3>ยังไม่มีรีวิวที่แสดงในรายการนี้</h3><p>แบ่งปันประสบการณ์เพื่อช่วยคนที่กำลังตัดสินใจเลือกเรียน</p></div>;
   const fileContent=filesLoading?<p className="ux-loading" role="status">กำลังโหลดไฟล์เรียน…</p>:
     fileError?<div className="alert alert-error ux-inline-error" role="alert"><span>โหลดไฟล์ไม่สำเร็จ: {fileError}</span><button type="button" className="btn-ghost" onClick={()=>setRetry(x=>x+1)}>ลองใหม่</button></div>:
-    shownFiles.length?shownFiles.map(f=><SummaryFileCard key={f.file_id} file={f} onChanged={load} onLikeChanged={updateFileLike}/>):
+    shownFiles.length?shownFiles.map(f=><SummaryFileCard key={f.file_id} file={f} onChanged={load} onLikeChanged={updateFileLike} onCourseError={handleCourseError}/>):
     <div className="card ux-empty"><h3>ยังไม่มีไฟล์เรียนในรายการนี้</h3><p>แบ่งปันสรุปหรือเอกสารที่คุณมีสิทธิ์เผยแพร่ ผ่านปุ่มอัปโหลดด้านบน</p></div>;
   return <section className="course-detail-page"><Link className="back-link" to={listMode?path:from} state={{from}}>← {listMode?'รายละเอียดวิชา':from.startsWith('/dashboard')?'กลับไปอันดับที่เลือกไว้':'กลับไปผลการค้นหา'}</Link>
     <div className={`ux-course-hero ${listMode?'ux-compact-hero':''}`}><div><span className="ux-card-code">{course.course_code}</span><h1>{course.course_name}</h1><p className="ux-course-subtitle">สจล. · {course.faculty_name} · {course.department}</p><div className="ux-course-meta"><span className="ux-term-pill">ปี {course.academic_year} · {semesterLabel(course.semester)}</span><span>{course.credits} หน่วยกิต</span></div><div className="ux-course-teachers"><span>ผู้สอน</span>{course.instructors.map(t=><Link key={t.instructor_id} to={`/instructor/${t.instructor_id}`}>{t.name}</Link>)}</div></div>
@@ -103,7 +110,7 @@ export default function CourseDetail({listMode=null}){
     {tab==='reviews'?reviewContent:fileContent}
     {!listMode&&(tab==='reviews'?reviews.length:files.length)>0&&<div className="ux-more-link"><Link className="btn btn-ghost" to={path+(tab==='files'?'/summary-files':'/reviews')} state={{from}}>{tab==='files'?`ดูไฟล์ทั้งหมด (${files.length})`:`ดูรีวิวทั้งหมด (${reviews.length})`} <svg className="ux-more-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></Link></div>}
     <p className="ux-page-note">ข้อมูลจากผู้ใช้ · ปี เทอม และผู้สอนเป็นบริบทของรายการนี้ ไม่รับรองการเปิดสอนหรือประวัติการเรียน</p>
-    {dialog==='review'&&<ReviewEditor courseId={id} course={course} review={ownReview} onClose={()=>setDialog(null)} onSaved={()=>load()}/>}
-    {dialog==='upload'&&<UploadDialog courseId={id} course={course} quota={permissions?.files} onClose={()=>setDialog(null)} onSaved={()=>load()}/>}
+    {dialog==='review'&&<ReviewEditor courseId={id} course={course} review={ownReview} onClose={()=>setDialog(null)} onSaved={()=>load()} onCourseError={handleCourseError}/>}
+    {dialog==='upload'&&<UploadDialog courseId={id} course={course} quota={permissions?.files} onClose={()=>setDialog(null)} onSaved={()=>load()} onCourseError={handleCourseError}/>}
   </section>;
 }
