@@ -4,6 +4,7 @@ import {api} from './api.js';
 import {useAuth} from './AuthContext.jsx';
 import {RatingBreakdown,ratingsFromReview} from './RatingStars.jsx';
 import Avatar from './Avatar.jsx';
+import ExpandableText from './components/ExpandableText.jsx';
 import ReviewEditor from './components/ReviewEditor.jsx';
 import CommentThread from './components/CommentThread.jsx';
 import ActionMenu from './components/ActionMenu.jsx';
@@ -36,8 +37,8 @@ export default function ReviewCard({review:r,course,onChanged,onLikeChanged,onCo
     }finally{actionRunning.current=false;setBusy(false);}
   }
   const own=user?.user_id===r.reviewer_id;
-  return <article className="card ux-review-card"><div className="ux-review-header"><div className="ux-author"><Avatar url={r.reviewer_avatar} size={34}/><div><Link to={`/profile/${r.reviewer_id}`}>{r.reviewer_name}</Link><time dateTime={r.created_at+'Z'}>{new Date(r.created_at+'Z').toLocaleDateString('th-TH')}{r.edited_at?' · แก้ไขแล้ว':''}</time></div></div><span className="ux-review-score" aria-label={`ความพึงพอใจ ${r.rating_satisfaction} จาก 5`}>ความพึงพอใจ {r.rating_satisfaction} / 5</span></div>
-    <p className="review-content">{r.content}</p><div className="tag-chips">{(r.tags||[]).map(t=><span className="tag-chip tag-chip-static" key={t.tag_id}>#{t.tag_name}</span>)}</div>
+  return <article className="card ux-review-card"><div className="ux-review-header"><div className="ux-author"><Avatar url={r.reviewer_avatar} size={34}/><div><Link title={r.reviewer_name} to={`/profile/${r.reviewer_id}`}>{r.reviewer_name}</Link><time dateTime={r.created_at+'Z'}>{new Date(r.created_at+'Z').toLocaleDateString('th-TH')}{r.edited_at?' · แก้ไขแล้ว':''}</time></div></div><span className="ux-review-score" aria-label={`ความพึงพอใจ ${r.rating_satisfaction} จาก 5`}>ความพึงพอใจ {r.rating_satisfaction} / 5</span></div>
+    <ExpandableText text={r.content} limit={300} className="review-content"/><div className="tag-chips">{(r.tags||[]).map(t=><span className="tag-chip tag-chip-static" key={t.tag_id}>#{t.tag_name}</span>)}</div>
     <details className="ux-review-details"><summary>ดูคะแนนรายด้าน</summary><RatingBreakdown ratings={ratingsFromReview(r)} excludeSatisfaction/></details>
     <div className="ux-card-actions">{user?<button type="button" className="btn-ghost" disabled={busy} aria-pressed={r.liked_by_me} aria-label={`ถูกใจรีวิว ${r.like_count} ครั้ง`} onClick={()=>action('/like',r.liked_by_me?'DELETE':'POST')}><svg className="review-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg> {r.like_count} ถูกใจ</button>:<Link className="btn btn-ghost" to={loginPath(location.pathname+location.search)}><svg className="review-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg> {r.like_count} ถูกใจ</Link>}
       <button type="button" className="btn-ghost" aria-expanded={comments} onClick={()=>setComments(!comments)}>ความคิดเห็น ({r.comment_count})</button>

@@ -1300,3 +1300,71 @@ button[aria-pressed="true"] .review-heart { fill: currentColor; }
   .admin-courses-page .admin-course-editor .ux-course-form > .ux-form-block,
   .admin-courses-page .admin-course-editor .ux-course-form > .ux-form-block + .ux-form-block { padding: 16px; }
 }
+/* Keep user content from stretching catalog rows and discussion cards. */
+.catalog-page .ux-course-card .ux-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  max-height: 3.1em;
+  min-width: 0;
+}
+.ux-card-top { min-width: 0; }
+.ux-card-top .ux-card-code { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ux-author, .ux-author > div, .ux-comment-heading > div { min-width: 0; }
+.ux-author > div > a, .ux-comment-heading > div > a { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.expandable-text { min-width: 0; }
+.expandable-text > p { overflow-wrap: anywhere; white-space: pre-wrap; }
+.expandable-text.is-truncated > p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
+.expandable-text-toggle { background: none; border: 0; padding: 0; margin: 4px 0 10px; min-height: 32px; color: #a83b0c; font: inherit; font-weight: 600; cursor: pointer; }
+.expandable-text-toggle:hover { background: none; text-decoration: underline; }
+/* Bound user-entered labels while keeping full details and editors usable. */
+.card, .cc-context, .ux-page-heading > div, .ux-course-hero > div,
+.profile-hero-person, .profile-hero-copy, .profile-header > div,
+.plan-card > a, .plan-item-info, .ux-file-info, .ux-file-info > div,
+.ux-modal-header > div, .admin-merge-history-details, .ad-list li > div { min-width: 0; }
+main :where(h1,h2,h3,h4,p,dd,label,strong,a,span),
+.ux-modal :where(h2,p,strong,label), .app-toast-copy { overflow-wrap: anywhere; }
+input, textarea, select { min-width: 0; max-width: 100%; }
+textarea { max-height: 50dvh; overflow-y: auto; }
+select { text-overflow: ellipsis; }
+.ux-card-top .ux-term-pill { flex-shrink: 0; }
+.catalog-page .ux-course-card > .meta,
+.catalog-page .ux-course-card .cc-context > span,
+.ux-rank-body > a, .profile-review-top > strong,
+.plan-card > a > strong, .plan-item-info > strong,
+.selected-course-chip > strong, .enrollment-card strong,
+.ux-file-info h3, .cc-upload-queue strong {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere; min-width: 0;
+}
+.profile-review-link .review-content {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  overflow: hidden; overflow-wrap: anywhere;
+}
+.ux-course-hero h1, .profile-hero-copy h1, .instructor-page .course-title,
+.plan-header-row .course-title {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  overflow: hidden; overflow-wrap: anywhere;
+}
+.ux-account-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ux-account-panel-header strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ux-author { flex: 1; }
+.ux-author > :first-child, .ux-account-panel-header > :first-child { flex-shrink: 0; }
+.ux-review-score, .plan-card > button, .plan-header-row > button { flex-shrink: 0; }
+.ux-course-teachers a, .tag-chip, .ux-selected-teachers button,
+.cc-teacher-options button, .course-picker-list-item,
+.cc-preview dd, .admin-course-row label, .ux-modal-header h2,
+.ux-modal-header p, .app-toast-copy strong, .app-toast-copy p {
+  max-width: 100%; overflow-wrap: anywhere; white-space: normal;
+}
+.tag-chip { min-width: 0; }
+.ux-file-type { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ux-file-info { flex: 1; }
+.ux-file-info > div:last-child { flex: 1; }
+.ux-review-header, .ux-file-main, .plan-header-row { min-width: 0; }
+@media (max-width: 650px) {
+  .ux-review-header { flex-wrap: wrap; }
+  .ux-review-score { max-width: 100%; }
+  .plan-header-row { flex-wrap: wrap; }
+}

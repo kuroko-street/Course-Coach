@@ -53,7 +53,7 @@ export default function Profile() {
         <div className="profile-hero-person">
           <ProfilePortrait name={data.user.display_name} url={data.user.avatar_url} />
           <div className="profile-hero-copy">
-            <h1>{data.user.display_name}</h1>
+            <h1 title={data.user.display_name}>{data.user.display_name}</h1>
             <p>โปรไฟล์และผลงานที่แบ่งปันใน Course Coach</p>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function Profile() {
           <Link to="/" className="btn">ค้นหารายวิชา</Link>
         </div> : <div className="profile-review-list">
           {data.reviews.map(r => <Link className="profile-review-link" to={`/course/${r.course_id}`} key={r.review_id}>
-            <div className="profile-review-top"><strong>{r.course_code} · {r.course_name}</strong><span>♡ {r.like_count}</span></div>
+            <div className="profile-review-top"><strong title={`${r.course_code} · ${r.course_name}`}>{r.course_code} · {r.course_name}</strong><span>♡ {r.like_count}</span></div>
             <div className="meta">ปี {r.academic_year} · {r.semester === "summer" ? "ภาคฤดูร้อน" : `เทอม ${r.semester}`} · พึงพอใจ {r.rating_satisfaction} / 5</div>
             <p className="review-content">{r.content}</p>
           </Link>)}
