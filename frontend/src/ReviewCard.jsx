@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useRef,useState} from 'react';
 import {Link,useLocation} from 'react-router-dom';
 import {api} from './api.js';
 import {useAuth} from './AuthContext.jsx';
@@ -11,11 +11,28 @@ import {ConfirmDialog} from './components/Modal.jsx';
 import {loginPath} from './components/CourseUI.jsx';
 import {useToast} from './components/ToastProvider.jsx';
 
-export default function ReviewCard({review:r,course,onChanged}){
+export default function ReviewCard({review:r,course,onChanged,onLikeChanged}){
   const toast=useToast();
   const {user}=useAuth(),location=useLocation();
   const [comments,setComments]=useState(false),[edit,setEdit]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirm,setConfirm]=useState(null);
-  async function action(suffix,method){setBusy(true);setError('');try{await api(`/reviews/${r.review_id}${suffix}`,{method});setConfirm(null);await onChanged?.();if(suffix==='/report')toast.success('รายงานรีวิวแล้ว');else if(method==='DELETE'&&suffix==='')toast.success('ลบรีวิวแล้ว');}catch(e){if(suffix==='/like')toast.error('กดถูกใจไม่สำเร็จ',e.message);else setError(e.message);}finally{setBusy(false);}}
+  const actionRunning=useRef(false);
+  async function action(suffix,method){
+    if(actionRunning.current)return;
+    actionRunning.current=true;setBusy(true);setError('');
+    const liking=suffix==='/like',before={liked:r.liked_by_me,count:r.like_count};
+    if(liking)onLikeChanged?.(r.review_id,!before.liked,before.count+(before.liked?-1:1));
+    try{
+      const result=await api(`/reviews/${r.review_id}${suffix}`,{method});
+      setConfirm(null);
+      if(liking)onLikeChanged?.(r.review_id,result.liked,result.like_count);
+      else await onChanged?.();
+      if(suffix==='/report')toast.success('รายงานรีวิวแล้ว');
+      else if(method==='DELETE'&&suffix==='')toast.success('ลบรีวิวแล้ว');
+    }catch(e){
+      if(liking){onLikeChanged?.(r.review_id,before.liked,before.count);toast.error('กดถูกใจไม่สำเร็จ',e.message);}
+      else setError(e.message);
+    }finally{actionRunning.current=false;setBusy(false);}
+  }
   const own=user?.user_id===r.reviewer_id;
   return <article className="card ux-review-card"><div className="ux-review-header"><div className="ux-author"><Avatar url={r.reviewer_avatar} size={34}/><div><Link to={`/profile/${r.reviewer_id}`}>{r.reviewer_name}</Link><time dateTime={r.created_at+'Z'}>{new Date(r.created_at+'Z').toLocaleDateString('th-TH')}{r.edited_at?' · แก้ไขแล้ว':''}</time></div></div><span className="ux-review-score" aria-label={`ความพึงพอใจ ${r.rating_satisfaction} จาก 5`}>★ {r.rating_satisfaction} / 5</span></div>
     <p className="review-content">{r.content}</p><div className="tag-chips">{(r.tags||[]).map(t=><span className="tag-chip tag-chip-static" key={t.tag_id}>#{t.tag_name}</span>)}</div>

@@ -50,16 +50,18 @@ export default function Plans() {
   }, []);
 
   async function handleCreate() {
+    if (creating) return;
     setCreating(true);
     setError("");
     try {
-      await api("/plans", {
+      const planName = nextPlanName(plans);
+      const created = await api("/plans", {
         method: "POST",
         userId: user.user_id,
-        body: { plan_name: nextPlanName(plans) },
+        body: { plan_name: planName },
       });
+      setPlans((current) => [{ plan_id: created.plan_id, plan_name: planName, item_count: 0, total_credits: 0 }, ...current]);
       toast.success("สร้างแผนการเรียนแล้ว");
-      await load();
     } catch (err) {
       toast.error("สร้างแผนไม่สำเร็จ", err.message);
     } finally {
@@ -89,7 +91,7 @@ export default function Plans() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="plan-create-form">
-        <button className="btn-primary" type="button" onClick={handleCreate} disabled={creating}>
+        <button className="btn-primary" type="button" onClick={handleCreate} disabled={creating || loading}>
           {creating ? "กำลังสร้าง…" : "+ สร้างแผน"}
         </button>
       </div>
