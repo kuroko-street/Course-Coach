@@ -19,7 +19,7 @@ export default function CommentThread({basePath,onChanged}){
     if(busy)return;setBusy(true);setError('');
     try{
       await api(path,{method,body});done?.();setConfirm(null);
-      try{await load();await onChanged?.();toast.success(path.endsWith('/report')?'รายงานความคิดเห็นแล้ว':method==='DELETE'?'ลบความคิดเห็นแล้ว':method==='PUT'?'แก้ไขความคิดเห็นแล้ว':'ส่งความคิดเห็นแล้ว');}catch(err){setError('บันทึกแล้ว แต่โหลดความคิดเห็นล่าสุดไม่สำเร็จ กรุณาปิดและเปิดความคิดเห็นใหม่');}
+      try{await load();await onChanged?.();toast.success(path.endsWith('/report')?'ส่งรายงานแล้ว':method==='DELETE'?'ลบความคิดเห็นแล้ว':method==='PUT'?'แก้ไขความคิดเห็นแล้ว':'ส่งความคิดเห็นแล้ว');}catch(err){setError('บันทึกแล้ว แต่โหลดความคิดเห็นล่าสุดไม่สำเร็จ กรุณาปิดและเปิดความคิดเห็นใหม่');}
     }catch(err){setError(err.message);}finally{setBusy(false);}
   }
   return <div className="comments-list ux-comments">
@@ -32,6 +32,6 @@ export default function CommentThread({basePath,onChanged}){
     </article>)}
     {error&&!confirm&&<p role="alert" className="alert alert-error">{error}</p>}
     {user?<form className="ux-comments-form" onSubmit={e=>{e.preventDefault();action(`${basePath}/comments`,'POST',{content:text.trim()},()=>setText(''));}}><label>แสดงความคิดเห็น<textarea value={text} required maxLength={2000} rows={2} disabled={busy} onChange={e=>setText(e.target.value)} placeholder="พูดคุยหรือสอบถามเกี่ยวกับเนื้อหานี้…"/></label><button disabled={busy||!text.trim()}>{busy?'กำลังบันทึก…':'ส่งความคิดเห็น'}</button></form>:<Link to={loginPath(location.pathname+location.search)}>เข้าสู่ระบบเพื่อแสดงความคิดเห็น</Link>}
-    {confirm&&<ConfirmDialog title={confirm.type==='delete'?'ลบความคิดเห็นนี้?':'รายงานความคิดเห็นนี้?'} confirmLabel={confirm.type==='delete'?'ยืนยันลบความคิดเห็น':'ยืนยันรายงาน'} busy={busy} error={error} onClose={()=>setConfirm(null)} onConfirm={()=>action(`${basePath}/comments/${confirm.id}${confirm.type==='report'?'/report':''}`,confirm.type==='delete'?'DELETE':'POST',undefined,()=>{if(confirm.type==='report')setReported(prev=>[...prev,confirm.id]);})}>{confirm.type==='delete'?'ความคิดเห็นนี้จะไม่แสดงใต้เนื้อหาอีกต่อไป':'ใช้เมื่อพบเนื้อหาที่ไม่เหมาะสม เมื่อครบ 5 บัญชีจะซ่อนเฉพาะความคิดเห็นนี้ ไม่ซ่อนรีวิวหรือไฟล์หลัก'}</ConfirmDialog>}
+    {confirm&&<ConfirmDialog title={confirm.type==='delete'?'ลบความคิดเห็นนี้?':'รายงานความคิดเห็นนี้?'} confirmLabel={confirm.type==='delete'?'ยืนยันลบความคิดเห็น':'ยืนยันรายงาน'} busy={busy} error={error} onClose={()=>setConfirm(null)} onConfirm={()=>action(`${basePath}/comments/${confirm.id}${confirm.type==='report'?'/report':''}`,confirm.type==='delete'?'DELETE':'POST',undefined,()=>{if(confirm.type==='report')setReported(prev=>[...prev,confirm.id]);})}>{confirm.type==='delete'?'ความคิดเห็นนี้จะไม่แสดงใต้เนื้อหาอีกต่อไป':'คุณต้องการรายงานความคิดเห็นนี้ว่าไม่เหมาะสมใช่หรือไม่?'}</ConfirmDialog>}
   </div>;
 }

@@ -19,7 +19,7 @@ export function CourseCard({course}){
     <strong className="ux-card-title">{course.course_name}</strong><div className="meta">{course.faculty_name||course.faculty} · {course.department_name||course.department}</div>
     <div className="cc-context"><span>ผู้สอน: {teacherNames(course.instructors)||'–'}</span><span>{course.credits??'–'} หน่วยกิต</span></div>
     <div className="tag-chips">{(course.tags||[]).slice(0,3).map(tag=><span className="tag-chip tag-chip-static" key={tag.tag_id||tag}>#{tag.tag_name||tag}</span>)}</div>
-    <div className="ux-card-footer"><div>{score!=null?<><div className="ux-card-score"><span aria-hidden="true">★</span><strong>{Number(score).toFixed(2)}</strong><span>/ 5</span></div><span className="meta">ความพึงพอใจ</span></>:<span className="meta">ยังไม่มีคะแนน</span>}</div><span className="meta">{count} รีวิว <span aria-hidden="true">→</span></span></div>
+    <div className="ux-card-footer"><div className="ux-card-rating">{score!=null?<><div className="ux-card-score"><svg className="ux-card-star" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z"/></svg><strong>{Number(score).toFixed(2)}</strong><span>/ 5</span></div></>:null}<div className="meta ux-card-rating-caption">{score!=null?'ความพึงพอใจ':'ยังไม่มีคะแนน'} · <span className="ux-card-review-count">{count} รีวิว</span></div></div><svg className="ux-card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
   </Link>;
 }
 export function useCatalogOptions(){
