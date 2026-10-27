@@ -1,0 +1,17 @@
+import {Link} from 'react-router-dom';
+
+export default function MergeHistory({history}){
+  return <article className="card admin-merge-history">
+    <h2>ประวัติการรวมล่าสุด</h2>
+    <p className="muted">การรวมรายวิชาสูงสุด 100 รายการล่าสุด</p>
+    {history.length?<ul>{history.map(item=><li key={item.merge_id}>
+      <div className="admin-merge-history-details">
+        <strong>รวมรายวิชา</strong>
+        <p className="muted">{item.actor || `แอดมิน #${item.admin_id}`} · {new Date(item.created_at).toLocaleString('th-TH')}</p>
+        <p>ต้นทาง {item.source_course_ids.map(id=>`#${id}`).join(', ')} → วิชาหลัก #{item.primary_course_id}</p>
+        <p className="admin-merge-history-reason">เหตุผล: {item.reason}</p>
+      </div>
+      <Link to={`/course/${item.primary_course_id}`}>วิชา #{item.primary_course_id}</Link>
+    </li>)}</ul>:<div className="admin-merge-history-empty">ยังไม่มีประวัติการรวมรายวิชา</div>}
+  </article>;
+}

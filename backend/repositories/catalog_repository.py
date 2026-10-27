@@ -233,5 +233,8 @@ class CatalogRepository:
 
     def history(self, conn):
         with dict_cursor(conn) as cur:
-            cur.execute("SELECT merge_id,admin_id,primary_course_id,source_course_ids,reason,created_at FROM course_merge_history ORDER BY merge_id DESC LIMIT 100")
+            cur.execute("""SELECT h.merge_id,h.admin_id,h.primary_course_id,h.source_course_ids,h.reason,h.created_at,
+                       COALESCE(NULLIF(u.display_name,''),u.username,'บัญชีที่ไม่พร้อมใช้งาน') AS actor
+                FROM course_merge_history h LEFT JOIN users u ON u.user_id=h.admin_id
+                ORDER BY h.merge_id DESC LIMIT 100""")
             return cur.fetchall()

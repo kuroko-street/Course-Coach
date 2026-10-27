@@ -5,6 +5,7 @@ import CourseForm,{coursePayload,numericPayload} from './components/CourseForm.j
 import {CatalogFilters,CourseContext,useCatalogOptions} from './components/CourseUI.jsx';
 import {useToast} from './components/ToastProvider.jsx';
 import {ConfirmDialog} from './components/Modal.jsx';
+import MergeHistory from './components/MergeHistory.jsx';
 import {reviewChoicesForStrategy} from './mergeReviewSelection.js';
 
 const FIELD_LABELS={course_code:'รหัส',course_name:'ชื่อวิชา',faculty_id:'คณะ',department_id:'สาขา',academic_year:'ปี',semester:'เทอม',credits:'หน่วยกิต',instructor_ids:'ชุดผู้สอน',syllabus:'คำอธิบาย',additional_details:'รายละเอียดเพิ่มเติม'};
@@ -97,7 +98,7 @@ export default function Admin(){
       {data.courses.map(c=><div className="card admin-course-row" key={c.course_id} style={{marginTop:12}}><label><input type="checkbox" style={{width:'auto'}} checked={selected.some(x=>x.course_id===c.course_id)} onChange={()=>pick(c)}/> #{c.course_id} · <strong>{c.course_code} {c.course_name}</strong></label><CourseContext course={c}/><div className="cc-actions"><Link to={`/course/${c.course_id}`}>ดูรายวิชา</Link><span>{c.is_active?'เปิดแสดง':'ปิดแสดง'}</span><button className="btn-ghost" onClick={()=>{setSelected([c]);start('edit',c);}}>แก้ข้อมูล</button><button className="btn-ghost" disabled={busy} onClick={()=>setStatusTarget(c)}>{c.is_active?'ปิดแสดง':'เปิดแสดง'}</button></div></div>)}
       <div className="cc-pagination"><button disabled={page<=1} onClick={()=>setPage(x=>x-1)}>ก่อนหน้า</button><span>หน้า {page}</span><button disabled={page*50>=data.total} onClick={()=>setPage(x=>x+1)}>ถัดไป</button></div>
     </>}
-    <h2>ประวัติการรวมล่าสุด</h2>{history.length?history.map(h=><p className="card" key={h.merge_id}>#{h.merge_id} · {h.source_course_ids.join(', ')} → <Link to={`/course/${h.primary_course_id}`}>#{h.primary_course_id}</Link> · {h.reason}</p>):<p className="muted">ยังไม่มีการรวมรายวิชา</p>}
+    <MergeHistory history={history}/>
     {mergeConfirmOpen&&<ConfirmDialog title="ยืนยันรวมรายวิชา?" confirmLabel="ยืนยันรวมรายวิชา" busy={busy} error={error} onClose={()=>setMergeConfirmOpen(false)} onConfirm={confirm}>รวมรายการตามข้อมูลและผลตรวจสอบที่เลือกไว้ รายการต้นทางจะพาไปยังรายการหลัก การย้อนกลับต้องใช้ประวัติหรือสำเนาสำรอง</ConfirmDialog>}
     {statusTarget&&<ConfirmDialog title={statusTarget.is_active?'ปิดแสดงรายวิชานี้?':'เปิดแสดงรายวิชานี้?'} confirmLabel={statusTarget.is_active?'ยืนยันปิดแสดง':'ยืนยันเปิดแสดง'} busy={busy} onClose={()=>setStatusTarget(null)} onConfirm={()=>status(statusTarget)}>{statusTarget.is_active?'การปิดแสดงจะซ่อนรายวิชาและเนื้อหาภายในจากหน้าสาธารณะ คุณสามารถเปิดแสดงอีกครั้งได้ภายหลัง':'รายวิชาและเนื้อหาที่แสดงได้ภายในจะกลับมาปรากฏในหน้าสาธารณะ'}</ConfirmDialog>}
   </section>;
