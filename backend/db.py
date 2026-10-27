@@ -8,6 +8,7 @@ import threading
 
 import psycopg2
 import psycopg2.extras
+from psycopg2.extensions import TRANSACTION_STATUS_IDLE
 from psycopg2.pool import PoolError, ThreadedConnectionPool
 
 
@@ -21,9 +22,15 @@ class _ConnectionLease:
     def __init__(self, pool, connection):
         self._pool = pool
         self._connection = connection
+        self._session_changed = False
 
     def __getattr__(self, name):
         return getattr(self._connection, name)
+
+    def set_session(self, *args, **kwargs):
+        result = self._connection.set_session(*args, **kwargs)
+        self._session_changed = True
+        return result
 
     def close(self):
         if self._connection is None:
@@ -32,9 +39,14 @@ class _ConnectionLease:
         self._connection = None
         try:
             if not connection.closed:
-                # Read endpoints leave a transaction open; reset also clears
-                # set_session(readonly=True) before a writer borrows this slot.
-                connection.reset()
+                if self._session_changed:
+                    # The read-only and repeatable-read endpoints must not
+                    # lend their transaction settings to a later writer.
+                    connection.reset()
+                elif connection.get_transaction_status() != TRANSACTION_STATUS_IDLE:
+                    # A plain read leaves a transaction open. Roll it back
+                    # without the extra RESET commands on every request.
+                    connection.rollback()
         except Exception:
             self._pool.putconn(connection, close=True)
             return

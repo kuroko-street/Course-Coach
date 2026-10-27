@@ -34,7 +34,7 @@ class UserRepository:
             cur.execute(
                 f"""
                 SELECT user_id, username, email, student_number, role, avatar_url,
-                       {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until
+                       {DISPLAY_NAME_EXPR}, is_report_blocked, blocked_until, is_mock
                 FROM users WHERE user_id = %s;
                 """,
                 (user_id,),
