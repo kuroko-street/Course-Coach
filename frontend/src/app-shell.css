@@ -82,14 +82,17 @@ body { background: var(--shell-canvas); }
 
 .app-topbar-actions { display: flex; align-items: center; padding: 0 30px; }
 .app-topbar-actions .ux-account-menu>summary {
-  border: 0;
-  padding: 5px 7px;
+  min-height: 46px;
+  padding: 5px 12px 5px 7px;
   gap: 10px;
+  border: 1px solid #d8dfe8;
+  border-radius: 12px;
   color: var(--shell-ink);
   font-weight: 700;
 }
-.app-topbar-actions .ux-account-menu>summary:hover { background: #f5f7fa; }
 .app-topbar-actions .ux-account-name { max-width: 190px; }
+.app-topbar-actions .ux-account-chevron { width: 18px; height: 18px; margin-left: 12px; color: #536176; flex: 0 0 auto; transition: transform .16s ease; }
+.app-topbar-actions .ux-account-menu[open] .ux-account-chevron { transform: rotate(180deg); }
 
 .app-sidebar {
   position: fixed;
@@ -531,9 +534,10 @@ input[type="checkbox"]:checked::before { content: none; }
 .ux-dashboard .dashboard-summary-card strong { font-size: 28px; font-weight: 700; }
 .ux-dashboard .dashboard-summary-note { margin-top: 12px; line-height: 1.75; }
 .ux-dashboard .ux-rank-panel { margin-top: 28px; }
-.ux-dashboard .ux-rank-panel > .ux-tabs { gap: 8px; margin-bottom: 14px; align-items: stretch; }
+.ux-dashboard .ux-rank-panel > .ux-tabs { gap: 8px; margin-bottom: 14px; align-items: stretch; justify-content: flex-start; }
 .ux-dashboard .ux-rank-panel > .ux-tabs button {
-  flex: 1 1 0;
+  flex: 0 0 188px;
+  width: 188px;
   min-width: 0;
   min-height: 48px;
   margin: 0;
@@ -574,8 +578,8 @@ input[type="checkbox"]:checked::before { content: none; }
   .ux-dashboard .dashboard-summary-icon { width: 36px; height: 36px; border-radius: 10px; }
   .ux-dashboard .dashboard-summary-icon svg { width: 21px; height: 21px; }
   .ux-dashboard .dashboard-summary-card strong { font-size: 24px; }
-  .ux-dashboard .ux-rank-panel > .ux-tabs { gap: 6px; }
-  .ux-dashboard .ux-rank-panel > .ux-tabs button { font-size: 13px; padding: 10px 6px; }
+  .ux-dashboard .ux-rank-panel > .ux-tabs { gap: 6px; overflow-x: auto; }
+  .ux-dashboard .ux-rank-panel > .ux-tabs button { flex-basis: 154px; width: 154px; font-size: 13px; padding: 10px 6px; }
   .ux-dashboard .ux-rank-panel > .ux-rank-controls { padding: 16px; gap: 14px; }
   .ux-dashboard .ux-ranking-card { padding: 16px; gap: 10px; }
   .ux-dashboard .ux-rank-number { min-width: 30px; height: 32px; font-size: 15px; }
@@ -613,8 +617,16 @@ input[type="checkbox"]:checked::before { content: none; }
 .ux-dashboard .ux-rank-controls input,
 .ux-dashboard .ux-rank-controls select { border-radius: 10px; }
 .ux-dashboard .ux-ranking-card:first-child .ux-rank-number {
-  background: #fff3d9;
-  color: #8b5d0b;
+  background: #fff0c2;
+  color: #7b5200;
+}
+.ux-dashboard .ux-ranking-card:nth-child(2) .ux-rank-number {
+  background: #e7edf3;
+  color: #3e5268;
+}
+.ux-dashboard .ux-ranking-card:nth-child(3) .ux-rank-number {
+  background: #f6ddc7;
+  color: #814219;
 }
 @media (prefers-reduced-motion: reduce) {
   .ux-dashboard .ux-ranking-card { transition: none; }
@@ -979,15 +991,23 @@ button[aria-pressed="true"] .review-heart { fill: currentColor; }
 .ux-modal .ux-discard .btn-danger-outline { background: #fff; border: 1px solid #e7ccd0; color: #a12d39; }
 .ux-modal .ux-discard .btn-danger-outline:hover:not(:disabled) { background: #fff1f2; color: #922431; filter: none; }
 
-/* Account menu uses neutral navigation and a quiet sign-out action. */
+/* Account control and its two destinations. */
 .app-topbar-actions .ux-account-menu[open] > summary,
-.app-topbar-actions .ux-account-menu > summary:hover { background: #f1f4f8; color: #26364b; border-color: transparent; }
-.app-topbar-actions .ux-account-menu .ux-menu-panel { background: #fff; border-color: #dfe5ec; border-radius: 12px; box-shadow: 0 8px 24px #15203314; }
-.app-topbar-actions .ux-account-menu .ux-menu-panel > a { background: #fff; color: #465469; border-radius: 8px; font-weight: 500; }
-.app-topbar-actions .ux-account-menu .ux-menu-panel > a:hover { background: #f1f4f8; color: #26364b; }
-.app-topbar-actions .ux-account-menu .ux-menu-panel > button { background: #fff; color: #a12d39; border: 0; border-radius: 8px; font-weight: 500; }
-.app-topbar-actions .ux-account-menu .ux-menu-panel > button:hover:not(:disabled) { background: #fff1f2; color: #922431; filter: none; }
+.app-topbar-actions .ux-account-menu > summary:hover { background: #f7f9fc; color: var(--shell-ink); border-color: #cbd5e1; }
+.app-topbar-actions .ux-account-menu .ux-menu-panel { top: calc(100% + 16px); width: min(270px, calc(100vw - 24px)); padding: 6px; background: #fff; border-color: #d8dfe8; border-radius: 14px; box-shadow: 0 14px 36px #1520331c; }
+.app-topbar-actions .ux-account-menu .ux-menu-panel::before { content: ''; position: absolute; top: -7px; right: 22px; width: 12px; height: 12px; transform: rotate(45deg); border-top: 1px solid #d8dfe8; border-left: 1px solid #d8dfe8; background: #fff; }
+.app-topbar-actions .ux-account-panel-header { display: flex; align-items: center; gap: 12px; padding: 14px 12px 16px; margin: -6px -6px 7px; border-bottom: 1px solid #e7ebf0; color: var(--shell-ink); }
+.app-topbar-actions .ux-account-panel-header:hover { background: #fff; }
+.app-topbar-actions .ux-account-panel-header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.app-topbar-actions .ux-account-icon { width: 20px; height: 20px; flex: 0 0 auto; }
+.app-topbar-actions .ux-account-menu .ux-menu-panel > a,
+.app-topbar-actions .ux-account-menu .ux-menu-panel > button { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 10px 14px; border-radius: 9px; font-size: 14px; font-weight: 600; }
+.app-topbar-actions .ux-account-menu .ux-menu-panel > a { background: #fff4e9; color: #c24a0b; }
+.app-topbar-actions .ux-account-menu .ux-menu-panel > a:hover { background: #ffead7; color: #aa3d07; }
+.app-topbar-actions .ux-account-menu .ux-menu-panel > button { background: #fff; color: #465469; border: 0; }
+.app-topbar-actions .ux-account-menu .ux-menu-panel > button:hover:not(:disabled) { background: #f1f4f8; color: #26364b; filter: none; }
 .app-topbar-actions .ux-account-menu .ux-menu-panel > button:disabled { background: #f5f7fa; color: #8993a1; }
+@media (prefers-reduced-motion: reduce) { .app-topbar-actions .ux-account-chevron { transition: none; } }
 
 /* Profile primary actions only. */
 .profile-page .profile-name-form > button.btn-primary:not(:disabled),

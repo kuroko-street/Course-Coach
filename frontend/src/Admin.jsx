@@ -24,7 +24,14 @@ export default function Admin(){
   useEffect(()=>{api('/admin/merge-history').then(r=>setHistory(r.history)).catch(err=>setError(err.message));},[refresh]);
   function pick(c){if(selected.some(x=>x.course_id===c.course_id))setSelected(prev=>prev.filter(x=>x.course_id!==c.course_id));else if(selected.length<21)setSelected(prev=>[...prev,c]);else toast.info('เลือกได้สูงสุด 21 รายการต่อครั้ง');}
   function start(nextMode,c){setMode(nextMode);setPrimary(c.course_id);setForm(coursePayload(c));setCopiedFrom({});setPreview(null);setKeep([]);setKeepReviews([]);setAcceptOverage(false);setReason('');setError('');}
-  function editForm(next){setCopiedFrom(prev=>Object.fromEntries(Object.entries(prev).filter(([key])=>JSON.stringify(next[key])===JSON.stringify(form[key]))));setForm(next);setPreview(null);}
+  function editForm(next){
+    if(mode==='merge')setCopiedFrom(prev=>{
+      const updated={...prev};
+      Object.keys(FIELD_LABELS).forEach(key=>{if(JSON.stringify(next[key])!==JSON.stringify(form[key]))updated[key]='manual';});
+      return updated;
+    });
+    setForm(next);setPreview(null);
+  }
   function copyField(key,courseId){const c=selected.find(x=>x.course_id===Number(courseId));if(!c)return;setForm(prev=>({...prev,[key]:coursePayload(c)[key]}));setCopiedFrom(prev=>({...prev,[key]:c.course_id}));setPreview(null);}
   function mergeBody(){return {primary_course_id:primary,source_course_ids:selected.filter(c=>c.course_id!==primary).map(c=>c.course_id),final_course:numericPayload(form),reason:reason.trim(),keep_plan_item_ids:keep,keep_review_ids:keepReviews,accept_file_overage:acceptOverage};}
   async function save(e){e.preventDefault();setBusy(true);setError('');try{
@@ -44,7 +51,7 @@ export default function Admin(){
     {(error || optionsError)&&<p className="alert alert-error" role="alert">{error || optionsError}</p>}
     {mode&&options?<form className={`card admin-course-editor ${mode==='merge'?'admin-merge-editor':''}`} onSubmit={save}>
       <h2>{mode==='merge'?'รวมรายการวิชา':'แก้ข้อมูลรายวิชา'} #{primary}</h2>
-      {mode==='merge'&&<><label>รายการหลัก (ใช้ URL นี้ต่อ)<select value={primary} onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));setPrimary(c.course_id);setForm(coursePayload(c));setCopiedFrom({});setPreview(null);setKeep([]);}}>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} {c.course_code} {c.course_name} ({c.academic_year}/{c.semester})</option>)}</select></label><p>เลือกข้อมูลที่จะเก็บเป็นรายช่องจากวิชาอื่นที่เลือกไว้ หรือปรับในฟอร์มด้านล่าง ชุดผู้สอนไม่ถูกรวมอัตโนมัติ</p><div className="cc-form-grid">{Object.entries(FIELD_LABELS).map(([key,label])=><label key={key}>{label}: คัดลอกจาก<select value={copiedFrom[key]??''} onChange={e=>copyField(key,e.target.value)} disabled={busy}><option value="">เลือกต้นทาง</option>{selected.filter(c=>c.course_id!==primary).map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} · {c.course_name}</option>)}</select></label>)}</div></>}
+      {mode==='merge'&&<><label>รายการหลัก (ใช้ URL นี้ต่อ)<select value={primary} onChange={e=>{const c=selected.find(x=>x.course_id===Number(e.target.value));setPrimary(c.course_id);setForm(coursePayload(c));setCopiedFrom({});setPreview(null);setKeep([]);}}>{selected.map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} {c.course_code} {c.course_name} ({c.academic_year}/{c.semester})</option>)}</select></label><p>เลือกข้อมูลที่จะเก็บเป็นรายช่องจากวิชาอื่นที่เลือกไว้ หรือปรับในฟอร์มด้านล่าง ชุดผู้สอนไม่ถูกรวมอัตโนมัติ</p><div className="cc-form-grid">{Object.entries(FIELD_LABELS).map(([key,label])=><label key={key}>{label}: คัดลอกจาก<select value={copiedFrom[key]??primary} onChange={e=>copyField(key,e.target.value)} disabled={busy}><option value={primary}>#{primary} · {selectedPrimary?.course_name} (รายการหลัก)</option><option value="manual" disabled>ปรับเองในฟอร์ม</option>{selected.filter(c=>c.course_id!==primary).map(c=><option key={c.course_id} value={c.course_id}>#{c.course_id} · {c.course_name}</option>)}</select></label>)}</div></>}
       <CourseForm key={`${mode}-${primary}`} value={form} onChange={editForm} options={options} initialTeachers={mode==='merge'?selected.flatMap(c=>c.instructors):selectedPrimary?.instructors || []} disabled={busy}/>
       {mode==='merge'&&<label>เหตุผลที่ควรเป็นรายการเดียวกัน<textarea required minLength={5} maxLength={2000} value={reason} onChange={e=>{setReason(e.target.value);setPreview(null);}}/></label>}
       <div className="cc-actions"><button disabled={busy}>{busy?'กำลังตรวจสอบ…':mode==='merge'?'ตรวจผลกระทบก่อนรวม':'บันทึกการแก้ไข'}</button><button type="button" className="btn-ghost" disabled={busy} onClick={()=>setMode(null)}>ยกเลิก</button></div>

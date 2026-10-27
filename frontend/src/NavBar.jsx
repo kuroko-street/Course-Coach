@@ -16,9 +16,16 @@ function Icon({name}){
   return <svg className="app-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
+function AccountIcon({name}) {
+  return <svg className="ux-account-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {name==='profile'?<><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.5a7 7 0 0 1 14 0V20"/></>:<><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M14 8l4 4-4 4M9 12h9"/></>}
+  </svg>;
+}
+
 export default function NavBar(){
   const toast=useToast();
   const {user,authReady,isAdmin,logout}=useAuth();
+  const accountName=user?.display_name || user?.username || 'บัญชีของฉัน';
   const navigate=useNavigate(),location=useLocation();
   const [busy,setBusy]=useState(false),[menuOpen,setMenuOpen]=useState(false);
   useEffect(()=>setMenuOpen(false),[location.pathname]);
@@ -29,7 +36,7 @@ export default function NavBar(){
   const renderLink=([to,label,icon])=><NavLink key={to} to={to} end={to==='/'||to==='/admin'} className={({isActive})=>`app-side-link ${isActive||(to==='/'&&/^\/courses?(\/|$)/.test(location.pathname))?'active':''}`} onClick={()=>setMenuOpen(false)}><Icon name={icon}/><span>{label}</span></NavLink>;
   return <>
     <header className="app-topbar"><a className="ux-skip" href="#main-content">ข้ามไปเนื้อหา</a><div className="app-topbar-brand"><button type="button" className="app-menu-toggle" aria-label={menuOpen?'ปิดเมนู':'เปิดเมนู'} aria-controls="app-sidebar" aria-expanded={menuOpen} onClick={()=>setMenuOpen(open=>!open)}><span aria-hidden="true">☰</span></button><Link to="/" className="app-brand" onClick={()=>setMenuOpen(false)}><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 11 16 4l14 7-14 7L2 11Z" fill="currentColor"/><path d="M8 16v7c5 4 11 4 16 0v-7l-8 4-8-4Z" fill="currentColor"/><path d="M29 12v10" fill="none" stroke="currentColor" strokeWidth="2"/></svg><span>Course <em>Coach</em></span></Link></div>
-      <div className="app-topbar-actions">{!authReady?<span className="ux-auth-placeholder" aria-label="กำลังตรวจสอบบัญชี"/>:user?<ActionMenu label="เมนูบัญชีของฉัน" className="ux-account-menu" trigger={<><Avatar url={user.avatar_url} size={34}/><span className="ux-account-name">{user.display_name}</span><span aria-hidden="true">⌄</span></>}><Link to={`/profile/${user.user_id}`}>โปรไฟล์ของฉัน</Link><button disabled={busy} type="button" onClick={handleLogout}>ออกจากระบบ</button></ActionMenu>:<Link to="/login" className="btn btn-ghost">เข้าสู่ระบบ</Link>}</div>
+      <div className="app-topbar-actions">{!authReady?<span className="ux-auth-placeholder" aria-label="กำลังตรวจสอบบัญชี"/>:user?<ActionMenu label="เมนูบัญชีของฉัน" className="ux-account-menu" trigger={<><Avatar url={user.avatar_url} size={32}/><span className="ux-account-name">{accountName}</span><svg className="ux-account-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4 7 6 6 6-6"/></svg></>}><div className="ux-account-panel-header"><Avatar url={user.avatar_url} size={44}/><strong>{accountName}</strong></div><Link to={`/profile/${user.user_id}`}><AccountIcon name="profile"/>โปรไฟล์ของฉัน</Link><button disabled={busy} type="button" onClick={handleLogout}><AccountIcon name="logout"/>ออกจากระบบ</button></ActionMenu>:<Link to="/login" className="btn btn-ghost">เข้าสู่ระบบ</Link>}</div>
     </header>
     <button type="button" className={`app-sidebar-scrim ${menuOpen?'is-visible':''}`} aria-label="ปิดเมนู" tabIndex={menuOpen?0:-1} onClick={()=>setMenuOpen(false)}/>
     <aside id="app-sidebar" className={`app-sidebar ${menuOpen?'is-open':''}`} aria-label="เมนูเว็บไซต์"><nav className="app-side-nav" aria-label="เมนูหลัก">{links.map(renderLink)}{isAdmin&&<><div className="app-nav-divider"/><span className="app-nav-group">สำหรับผู้ดูแล</span>{adminLinks.map(renderLink)}</>}</nav></aside>

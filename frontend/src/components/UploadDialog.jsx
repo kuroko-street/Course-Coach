@@ -5,7 +5,7 @@ import {FileQuota} from './ContributionStatus.jsx';
 import {useToast} from './ToastProvider.jsx';
 const MAX_BYTES=10000000,EXTENSIONS=['pdf','jpg','jpeg','png','docx','pptx','xlsx'];
 
-export default function UploadDialog({courseId,course,quota,onClose,onSaved}){
+export default function UploadDialog({courseId,course,quota,onClose,onSaved,onCourseError}){
   const toast=useToast();
   const [queue,setQueue]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState('');const running=useRef(false),wrapper=useRef(null);
   const waiting=queue.filter(r=>r.status!=='success'&&!r.error),successCount=queue.filter(r=>r.status==='success').length;
@@ -23,11 +23,11 @@ export default function UploadDialog({courseId,course,quota,onClose,onSaved}){
       let uploaded=0,failed=0;
       for(const row of waiting){
         patch(row.id,{status:'uploading',attempted:true});
-        try{await apiUploadMany(`/courses/${courseId}/summary-files`,{files:[row.file],fields:{upload_request_id:row.id}});patch(row.id,{status:'success'});uploaded++;}catch(e){patch(row.id,{status:'failed',error:e.message});failed++;}
+        try{await apiUploadMany(`/courses/${courseId}/summary-files`,{files:[row.file],fields:{upload_request_id:row.id}});patch(row.id,{status:'success'});uploaded++;}catch(e){if(await onCourseError?.(e))return;patch(row.id,{status:'failed',error:e.message});failed++;}
       }
+      if(await onSaved?.()===false)return;
       if(uploaded)toast.success('อัปโหลดไฟล์แล้ว',`${uploaded} ไฟล์ถูกเพิ่มในรายวิชา`);
       if(failed)toast.error('บางไฟล์อัปโหลดไม่สำเร็จ',`ตรวจรายการที่มีข้อผิดพลาด ${failed} ไฟล์`);
-      await onSaved?.();
     }catch(e){setError('อัปโหลดแล้วบางรายการ แต่โหลดข้อมูลล่าสุดไม่สำเร็จ: '+e.message);}finally{running.current=false;setBusy(false);}
   }
   const dirty=queue.some(r=>r.status!=='success');

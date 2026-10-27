@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "./api.js";
 import { useAuth } from "./AuthContext.jsx";
 import { useToast } from "./components/ToastProvider.jsx";
+import useCourseUnavailableRedirect from "./useCourseUnavailableRedirect.js";
 
 const SEMESTER_OPTIONS = ["1", "2", "summer"];
 
@@ -23,6 +24,7 @@ export default function PlanDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const toast = useToast();
+  const {check:checkUnavailableCourse}=useCourseUnavailableRedirect();
 
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -137,7 +139,7 @@ export default function PlanDetail() {
       setCourseSearch("");
       await refreshAfterChange();
     } catch (err) {
-      toast.error("เพิ่มวิชาไม่สำเร็จ", err.message);
+      if (!(await checkUnavailableCourse(selectedCourse.course_id,err))) toast.error("เพิ่มวิชาไม่สำเร็จ", err.message);
     } finally {
       setAdding(false);
     }

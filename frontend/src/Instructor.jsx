@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "./api.js";
-import Avatar from "./Avatar.jsx";
+import InstructorAvatar from "./InstructorAvatar.jsx";
 import { CourseContext } from './components/CourseUI.jsx';
 
 /**
@@ -46,7 +46,7 @@ export default function Instructor() {
       </Link>
 
       <section className="profile-header">
-        <Avatar url={null} size={64} />
+        <InstructorAvatar size={64} />
         <div>
           <h1 className="course-title">{instructor.name}</h1>
           <span className="muted small">โปรไฟล์อาจารย์</span>
