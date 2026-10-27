@@ -1221,6 +1221,21 @@ button[aria-pressed="true"] .review-heart { fill: currentColor; }
 .admin-courses-page .admin-course-editor > .cc-actions { padding-top: 20px; border-top: 1px solid #edf0f4; }
 .admin-courses-page > h2 { margin-top: 28px; font-size: 21px; }
 .admin-courses-page > p.card { padding: 18px; border-color: #dfe5ec; border-radius: 12px; box-shadow: none; overflow-wrap: anywhere; }
+.admin-courses-page .admin-merge-history { margin-top: 30px; padding: 24px; border: 1px solid #dfe5ec; border-radius: 16px; box-shadow: none; }
+.admin-courses-page .admin-merge-history h2 { margin: 0; color: #26364b; font-size: 20px; }
+.admin-courses-page .admin-merge-history > p { margin: 8px 0 0; font-size: 14px; }
+.admin-courses-page .admin-merge-history ul { list-style: none; max-height: 440px; margin: 18px 0 0; padding: 0 10px 0 0; overflow-y: auto; scrollbar-gutter: stable; }
+.admin-courses-page .admin-merge-history li { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 17px 0; border-top: 1px solid #e5eaf0; }
+.admin-courses-page .admin-merge-history-details { min-width: 0; overflow-wrap: anywhere; }
+.admin-courses-page .admin-merge-history-details strong { color: #26364b; }
+.admin-courses-page .admin-merge-history-details p { margin: 6px 0 0; color: #536176; font-size: 13px; line-height: 1.6; }
+.admin-courses-page .admin-merge-history-details .admin-merge-history-reason { color: #647185; }
+.admin-courses-page .admin-merge-history li > a { flex-shrink: 0; color: #a83b0c; font-size: 14px; white-space: nowrap; }
+.admin-courses-page .admin-merge-history-empty { margin-top: 18px; padding: 28px 18px; border-radius: 12px; background: #f5f7fa; color: #647185; text-align: center; }
+@media (max-width: 650px) {
+  .admin-courses-page .admin-merge-history { padding: 18px; }
+  .admin-courses-page .admin-merge-history li { flex-wrap: wrap; gap: 8px; }
+}
 @media (max-width: 650px) {
   .admin-courses-page .cc-filters.ux-filters,
   .admin-courses-page .admin-course-row,
