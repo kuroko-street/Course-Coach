@@ -32,11 +32,11 @@ export function useContributionStatus(courseId,userId){
   return {state,error,refresh};
 }
 export function FileQuota({quota,compact=false}){
-  if(!quota)return <p className="muted">กำลังตรวจสิทธิ์ไฟล์…</p>;
-  return <div className="ux-quota-status">{!compact&&<div className="ux-quota-summary"><strong>อัปโหลดได้อีก {quota.available} ไฟล์</strong><p>ใช้อยู่ {quota.used} / 3 ช่อง{quota.held>0?` · พัก ${quota.held} ช่อง`:''}</p></div>}
-    {quota.over_limit>0&&<p className="ux-quota-alert">มีไฟล์หรือช่องพักเดิมเกินโควต้า เก็บไฟล์ไว้ครบ แต่อัปเพิ่มไม่ได้จนมีช่องว่าง</p>}
-    {quota.holds.map(h=><p className="ux-quota-alert" key={h.file_id}>ไฟล์ #{h.file_id} ถูกซ่อน · คืนช่องวันที่ {permissionDate(h.expires_at)} ลบระหว่างพักไม่คืนก่อนกำหนด</p>)}
-    {compact&&quota.available===0&&quota.held===0&&<p>ใช้ครบ 3 ช่องแล้ว ลบไฟล์ปกติของคุณเพื่อคืนช่องก่อนอัปโหลดใหม่</p>}
-    <details><summary>กติกาการอัปโหลด · 3 ไฟล์ต่อบัญชีต่อรายการวิชา</summary><p>หนึ่งไฟล์ใช้หนึ่งช่อง ลบไฟล์ปกติคืนช่องทันที ไฟล์ที่ถูกซ่อนเนื่องจากได้รับรายงานจะพักช่อง 7 วัน ลบระหว่างพักก็ไม่คืนก่อนกำหนด</p></details>
+  if(!quota)return <p className="muted">กำลังตรวจสิทธิไฟล์…</p>;
+  return <div className="ux-quota-status">{!compact&&<div className="ux-quota-summary"><strong>อัปโหลดได้อีก {quota.available} ไฟล์</strong><p>ใช้อยู่ {quota.used} / 3 สิทธิ{quota.held>0?` · พัก ${quota.held} สิทธิ`:''}</p></div>}
+    {quota.over_limit>0&&<p className="ux-quota-alert">มีไฟล์หรือสิทธิที่พักเดิมเกินโควต้า เก็บไฟล์ไว้ครบ แต่อัปเพิ่มไม่ได้จนมีสิทธิอัปโหลดที่เหลือ</p>}
+    {quota.holds.map(h=><p className="ux-quota-alert" key={h.file_id}>ไฟล์ #{h.file_id} ถูกซ่อน · คืนสิทธิอัปโหลดวันที่ {permissionDate(h.expires_at)} ลบระหว่างพักไม่คืนก่อนกำหนด</p>)}
+    {compact&&quota.available===0&&quota.held===0&&<p>ใช้ครบ 3 สิทธิแล้ว ลบไฟล์ปกติของคุณเพื่อคืนสิทธิอัปโหลดก่อนอัปโหลดใหม่</p>}
+    <details><summary>กติกาการอัปโหลด · 3 ไฟล์ต่อบัญชีต่อรายการวิชา</summary><p>หนึ่งไฟล์ใช้สิทธิอัปโหลดหนึ่งสิทธิ ลบไฟล์ปกติคืนสิทธิอัปโหลดทันที ไฟล์ที่ถูกซ่อนเนื่องจากได้รับรายงานจะพักสิทธิอัปโหลด 7 วัน ลบระหว่างพักก็ไม่คืนก่อนกำหนด</p></details>
   </div>;
 }
