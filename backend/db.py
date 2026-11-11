@@ -5,6 +5,7 @@ same image runs unchanged in Docker Compose, CI, or locally.
 """
 import os
 import threading
+import logging
 
 import psycopg2
 import psycopg2.extras
@@ -14,6 +15,7 @@ from psycopg2.pool import PoolError, ThreadedConnectionPool
 
 _pool = None
 _pool_lock = threading.Lock()
+logger = logging.getLogger(__name__)
 
 
 class _ConnectionLease:
@@ -60,7 +62,27 @@ def get_db_config() -> dict:
         "dbname": os.getenv("DB_NAME", "coursecoach"),
         "user": os.getenv("DB_USER", "coursecoach"),
         "password": os.getenv("DB_PASSWORD", "coursecoach_pass"),
+        "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 3,
+        "tcp_user_timeout": 30000,
     }
+
+
+def _check_connection(connection):
+    """Probe before starting application work; leave no transaction open."""
+    if connection.closed:
+        raise psycopg2.InterfaceError("Database connection is closed")
+    previous_autocommit = connection.autocommit
+    try:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    finally:
+        if not connection.closed:
+            connection.autocommit = previous_autocommit
 
 
 def get_connection():
@@ -76,9 +98,21 @@ def get_connection():
             if _pool is None:
                 _pool = ThreadedConnectionPool(1, 8, **get_db_config())
     try:
-        return _ConnectionLease(_pool, _pool.getconn())
+        connection = _pool.getconn()
     except PoolError:
         return psycopg2.connect(**get_db_config())
+    try:
+        _check_connection(connection)
+    except psycopg2.Error:
+        _pool.putconn(connection, close=True)
+        logger.warning("Discarded unusable pooled DB connection; opening a fresh connection")
+        # Retry acquisition only. No SQL belonging to the request has run yet,
+        # so writes/uploads/merges are never replayed after an uncertain commit.
+        return psycopg2.connect(**get_db_config())
+    except Exception:
+        _pool.putconn(connection, close=True)
+        raise
+    return _ConnectionLease(_pool, connection)
 
 
 def dict_cursor(conn):
